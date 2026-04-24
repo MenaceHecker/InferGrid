@@ -47,7 +47,7 @@ jobs:
         working-directory: inference-api
 
       - name: Run tests
-        run: pytest
+        run: pytest tests
         working-directory: inference-api
         env:
           MODEL_PATH: "models/classifier.onnx"
