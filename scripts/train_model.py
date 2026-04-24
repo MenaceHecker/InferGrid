@@ -4,7 +4,6 @@ and save it to models/classifier.pkl.
 
 """
 
-import os
 import pickle
 from pathlib import Path
 

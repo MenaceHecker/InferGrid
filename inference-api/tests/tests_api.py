@@ -3,13 +3,10 @@ Integration tests for the InferGrid Inference API.
 Uses a tiny in-memory mock model so tests run without a real .pkl file.
 """
 
-import numpy as np
-import pytest
-from fastapi.testclient import TestClient
-
 import app.main as main_module
+import pytest
 from app.main import app
-from app.models.sklearn_loader import SklearnLoader
+from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
 # Fixtures
