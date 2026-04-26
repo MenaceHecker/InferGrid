@@ -1,0 +1,29 @@
+# Keep the Docker build context small, only ship what the runtime needs
+
+# Dev and test artifacts
+tests/
+scripts/
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local model files — mount as a volume in production, bake into image for demo
+# models/  ← uncomment to exclude; leave commented to include for local docker run
+
+# Dependency and build files not needed at runtime
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Docs and CI
+*.md
+.github/
+.pre-commit-config.yaml
+
+# Environment files
+.env
+.env.*
