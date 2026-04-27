@@ -91,6 +91,7 @@ app = FastAPI(
 # Routes
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Liveness probe, returns 200 when the process is alive."""
