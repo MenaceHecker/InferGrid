@@ -10,7 +10,6 @@ from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.schemas import PredictRequest, PredictResponse
 
-
 # ---------------------------------------------------------------------------
 # App state
 # ---------------------------------------------------------------------------
