@@ -1,5 +1,7 @@
 import os
+import pickle
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -22,8 +24,6 @@ def _load_model(model_path: str) -> tuple[OnnxLoader | SklearnLoader, str]:
     Returns (loader_instance, backend_name).
     """
     if model_path.endswith(".onnx"):
-        # ONNX needs the class list, load from paired .pkl if present,
-        # or use the standard 20 Newsgroups class order as default.
         classes = _get_classes(model_path)
         loader = OnnxLoader(model_path, classes)
         return loader, "onnx"
@@ -37,16 +37,12 @@ def _get_classes(onnx_path: str) -> list[str]:
     Resolve class labels for the ONNX model.
     Looks for a sibling .pkl file first; falls back to 20 Newsgroups order.
     """
-    import pickle
-    from pathlib import Path
-
     pkl_path = Path(onnx_path).with_suffix(".pkl")
     if pkl_path.exists():
         with open(pkl_path, "rb") as f:
             payload = pickle.load(f)
         return list(payload["classes"])
 
-    # Standard 20 Newsgroups target_names order (sklearn default sort)
     return [
         "alt.atheism",
         "comp.graphics",
@@ -98,7 +94,7 @@ app = FastAPI(
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    """Liveness probe, it returns 200 when the process is alive."""
+    """Liveness probe, returns 200 when the process is alive."""
     return {
         "status": "ok",
         "model_loaded": _model is not None,
