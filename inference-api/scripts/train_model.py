@@ -14,17 +14,22 @@ from sklearn.pipeline import Pipeline
 
 OUTPUT_DIR = Path(__file__).parent.parent / "models"
 OUTPUT_PATH = OUTPUT_DIR / "classifier.pkl"
+DATA_HOME = Path(__file__).parent.parent / "data" / "sklearn"
 
 
 def train() -> None:
     print("Fetching 20 Newsgroups dataset...")
-    data = fetch_20newsgroups(subset="train", remove=("headers", "footers", "quotes"))
+    data = fetch_20newsgroups(
+        subset="train",
+        remove=("headers", "footers", "quotes"),
+        data_home=DATA_HOME,
+    )
 
     print(f"Training on {len(data.data)} samples, {len(data.target_names)} classes...")
     pipeline = Pipeline(
         [
             ("tfidf", TfidfVectorizer(max_features=30_000, sublinear_tf=True)),
-            ("clf", LogisticRegression(max_iter=1000, C=5.0, solver="lbfgs", n_jobs=-1)),
+            ("clf", LogisticRegression(max_iter=1000, C=5.0, solver="lbfgs")),
         ]
     )
     pipeline.fit(data.data, data.target)
