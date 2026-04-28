@@ -16,8 +16,7 @@ class OnnxLoader:
             import onnxruntime as rt
         except ImportError as e:
             raise RuntimeError(
-                "onnxruntime is required for ONNX models. "
-                "Install it with `pip install onnxruntime`"
+                "onnxruntime is required for ONNX models. Install it with `pip install onnxruntime`"
             ) from e
 
         path = Path(model_path)
@@ -42,9 +41,7 @@ class OnnxLoader:
         Input must be a 2D string array: shape [1, 1].
         """
         input_array = np.array([[text]])
-        label_preds, proba_preds = self.session.run(
-            None, {self._input_name: input_array}
-        )
+        label_preds, proba_preds = self.session.run(None, {self._input_name: input_array})
 
         class_idx = int(label_preds[0])
         confidence = float(np.max(proba_preds[0]))
