@@ -27,8 +27,10 @@ class MockModel:
 def inject_mock_model(monkeypatch):
     """Swap the real model for MockModel before every test."""
     monkeypatch.setattr(main_module, "_model", MockModel())
+    monkeypatch.setattr(main_module, "_model_backend", "sklearn")
     yield
     monkeypatch.setattr(main_module, "_model", None)
+    monkeypatch.setattr(main_module, "_model_backend", "none")
 
 
 client = TestClient(app)
