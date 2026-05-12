@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-api
+  namespace: infergrid
+  labels:
+    app: inference-api
+    layer: inference
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inference-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0          # zero-downtime deploys
+  template:
+    metadata:
+      labels:
+        app: inference-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: inference-api
+          image: gcr.io/YOUR_PROJECT_ID/inference-api:latest   # replaced by CI
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: MODEL_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: MODEL_PATH
+            - name: MODEL_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: MODEL_BACKEND
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: inference-api-secret
+                  key: API_KEY
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:           # added fully on Day 10
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:          # model must be loaded before traffic is sent
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30
