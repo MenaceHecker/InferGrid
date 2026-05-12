@@ -1,0 +1,22 @@
+# service-nodeport.yaml
+# Use this instead of service.yaml when testing on a local kind cluster.
+# kind does not support type: LoadBalancer without MetalLB.
+# Switch back to service.yaml (ClusterIP + port-forward) for GKE.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-api-nodeport
+  namespace: infergrid
+  labels:
+    app: inference-api
+spec:
+  selector:
+    app: inference-api
+  type: NodePort
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000
+      nodePort: 30080
