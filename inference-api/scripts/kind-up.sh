@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # scripts/kind-up.sh
 # One-shot: create kind cluster, load the Docker image, apply all manifests.
-# Run from the repo root: ./inference-api/k8s/scripts/kind-up.sh
+# Run from the repo root: ./inference-api/scripts/kind-up.sh
 
 set -euo pipefail
 
 CLUSTER_NAME="infergrid"
 IMAGE_NAME="inference-api:latest"
-K8S_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+API_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+K8S_DIR="$API_DIR/k8s"
 
 echo "==> Building Docker image: $IMAGE_NAME"
-docker build -t "$IMAGE_NAME" "$(cd "$K8S_DIR/.." && pwd)"
+docker build -t "$IMAGE_NAME" "$API_DIR"
 
 echo "==> Creating kind cluster: $CLUSTER_NAME"
 if kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
