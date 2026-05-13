@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir uv==0.4.18
 COPY pyproject.toml .
 
 # Install runtime deps into an isolated prefix — excludes dev extras
-RUN uv pip install --system --no-cache --no-dev -e .
+RUN uv pip install --system --no-cache -e .
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime — minimal image, no build tools
