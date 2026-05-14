@@ -1,5 +1,6 @@
 import os
 import pickle
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -10,11 +11,16 @@ from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.schemas import PredictRequest, PredictResponse
 
-# ---------------------------------------------------------------------------
 # App state
-# ---------------------------------------------------------------------------
+
 _model: OnnxLoader | SklearnLoader | None = None
 _model_backend: str = "none"
+
+# Warm-up probe text, hort and unambiguous, fast to classify.
+_READINESS_PROBE_TEXT = "science space rocket"
+
+# /ready will return 503 if inference takes longer than this.
+_READINESS_TIMEOUT_MS = 500
 
 
 def _load_model(model_path: str) -> tuple[OnnxLoader | SklearnLoader, str]:
@@ -87,18 +93,54 @@ app = FastAPI(
 )
 
 
-# ---------------------------------------------------------------------------
 # Routes
-# ---------------------------------------------------------------------------
 
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    """Liveness probe, returns 200 when the process is alive."""
+    """
+    Liveness probe. Returns 200 as long as the process is alive.
+    Does NOT verify model performance, that is /ready's job.
+    Kubernetes restarts the pod if this stops returning 200.
+    """
     return {
         "status": "ok",
         "model_loaded": _model is not None,
         "model_backend": _model_backend,
+    }
+
+
+@app.get("/ready")
+async def ready() -> dict[str, Any]:
+    """
+    Readiness probe. Returns 200 only when:
+      1. The model is loaded.
+      2. A test inference completes within _READINESS_TIMEOUT_MS.
+
+    Kubernetes will not route traffic to this pod until this passes.
+    If inference degrades past the timeout, the pod is pulled from rotation
+    without being restarted (unlike a failed liveness probe).
+    """
+    if _model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    start = time.monotonic()
+    try:
+        _model.predict(_READINESS_PROBE_TEXT)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Inference error: {exc}") from exc
+
+    elapsed_ms = (time.monotonic() - start) * 1000
+    if elapsed_ms > _READINESS_TIMEOUT_MS:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Inference too slow: {elapsed_ms:.1f}ms > {_READINESS_TIMEOUT_MS}ms",
+        )
+
+    return {
+        "status": "ready",
+        "model_backend": _model_backend,
+        "inference_ms": round(elapsed_ms, 2),
     }
 
 
