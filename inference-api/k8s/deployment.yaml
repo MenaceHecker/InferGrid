@@ -55,18 +55,26 @@ spec:
             limits:
               cpu: "1000m"
               memory: "1Gi"
-          livenessProbe:           # added fully on Day 10
+          livenessProbe:
+            # Is the process alive? Restart if /health stops returning 200.
+            # Does NOT check model, a hung process with a loaded model
+            # should still be restarted.
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20
             failureThreshold: 3
-          readinessProbe:          # model must be loaded before traffic is sent
+            timeoutSeconds: 5
+          readinessProbe:
+            # Is the pod ready to serve traffic? Only passes when the model
+            # is loaded AND a test inference completes within 500ms.
+            # Kubernetes will not send traffic until this passes.
             httpGet:
-              path: /health
+              path: /ready
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 3
+            timeoutSeconds: 1      # enforces the 500ms inference budget + margin
       terminationGracePeriodSeconds: 30
