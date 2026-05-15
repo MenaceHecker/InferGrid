@@ -24,6 +24,7 @@ class SlowModel:
 
     def predict(self, text: str) -> tuple[str, float]:
         import time
+
         time.sleep(0.6)  # 600ms — over budget
         return self.classes[0], 0.5
 
@@ -75,6 +76,7 @@ def test_ready_reports_correct_backend():
 def test_ready_inference_ms_is_positive():
     response = client.get("/ready")
     assert response.json()["inference_ms"] >= 0
+
 
 # /ready — model not loaded
 
