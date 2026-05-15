@@ -1,147 +1,20 @@
----
-# Namespace for all observability components (Prometheus, Grafana, Adapter)
 apiVersion: v1
-kind: Namespace
+kind: ConfigMap
 metadata:
-  name: monitoring
-
----
-# ServiceAccount the adapter runs as
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: prometheus-adapter
+  name: prometheus-adapter-config
   namespace: monitoring
-
----
-# ClusterRole: read Prometheus metrics + serve custom metrics API
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: prometheus-adapter
-rules:
-  - apiGroups: [""]
-    resources: [nodes, namespaces, pods, services]
-    verbs: [get, list, watch]
-  - apiGroups: ["extensions", "apps"]
-    resources: [deployments, replicasets]
-    verbs: [get, list, watch]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: prometheus-adapter
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: prometheus-adapter
-subjects:
-  - kind: ServiceAccount
-    name: prometheus-adapter
-    namespace: monitoring
-
----
-# Allow the adapter to serve the custom.metrics.k8s.io API
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: prometheus-adapter:system:auth-delegator
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:auth-delegator
-subjects:
-  - kind: ServiceAccount
-    name: prometheus-adapter
-    namespace: monitoring
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: prometheus-adapter-auth-reader
-  namespace: kube-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: extension-apiserver-authentication-reader
-subjects:
-  - kind: ServiceAccount
-    name: prometheus-adapter
-    namespace: monitoring
-
----
-# Register the adapter as an API server for custom.metrics.k8s.io
-apiVersion: apiregistration.k8s.io/v1
-kind: APIService
-metadata:
-  name: v1beta1.custom.metrics.k8s.io
-spec:
-  service:
-    name: prometheus-adapter
-    namespace: monitoring
-  group: custom.metrics.k8s.io
-  version: v1beta1
-  insecureSkipTLSVerify: true
-  groupPriorityMinimum: 100
-  versionPriority: 100
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: prometheus-adapter
-  namespace: monitoring
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: prometheus-adapter
-  template:
-    metadata:
-      labels:
-        app: prometheus-adapter
-    spec:
-      serviceAccountName: prometheus-adapter
-      containers:
-        - name: prometheus-adapter
-          # k8s-sigs maintained image so stable, no auth required
-          image: registry.k8s.io/prometheus-adapter/prometheus-adapter:v0.12.0
-          args:
-            - --cert-dir=/var/run/serving-cert
-            - --config=/etc/adapter/config.yaml
-            # Point to your Prometheus service (deployed in Phase 3,
-            # but adapter is registered now so HPA is ready to go)
-            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local:9090
-            - --metrics-relist-interval=30s
-            - --v=4
-          ports:
-            - containerPort: 6443
-              name: https
-          volumeMounts:
-            - name: config
-              mountPath: /etc/adapter
-              readOnly: true
-            - name: serving-cert
-              mountPath: /var/run/serving-cert
-      volumes:
-        - name: config
-          configMap:
-            name: prometheus-adapter-config
-        - name: serving-cert
-          emptyDir: {}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: prometheus-adapter
-  namespace: monitoring
-spec:
-  selector:
-    app: prometheus-adapter
-  ports:
-    - name: https
-      port: 443
-      targetPort: 6443
+data:
+  config.yaml: |
+    rules:
+      - seriesQuery: 'http_requests_total{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace:
+              resource: namespace
+            pod:
+              resource: pod
+        name:
+          matches: "^http_requests_total$"
+          as: "http_requests_per_second"
+        metricsQuery: |
+          sum(rate(http_requests_total{<<.LabelMatchers>>}[2m])) by (<<.GroupBy>>)
