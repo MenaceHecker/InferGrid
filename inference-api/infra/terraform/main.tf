@@ -10,9 +10,9 @@ terraform {
 
   # Remote state in GCS, this keeps state out of the repo.
   # Creating the bucket first:
-  #   gsutil mb -l us-central1 gs://infergrid-prod-tfstate
+  #   gcloud storage buckets create gs://infergrid-prod-tfstate-tm2508 --location=us-central1
   backend "gcs" {
-    bucket = "infergrid-prod-tfstate"
+    bucket = "infergrid-prod-tfstate-tm2508"
     prefix = "infergrid/state"
   }
 }
