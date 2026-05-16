@@ -1,0 +1,22 @@
+# service-loadbalancer.yaml
+# Would use this on GKE instead of service-nodeport.yaml (kind local dev).
+# The static IP is provisioned by Terraform (google_compute_global_address).
+# Get the IP from: terraform output inference_api_ips
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-api
+  namespace: infergrid
+  annotations:
+    # Pins the LoadBalancer to the static IP from Terraform
+    kubernetes.io/ingress.global-static-ip-name: "infergrid-inference-api-ip"
+spec:
+  selector:
+    app: inference-api
+  type: LoadBalancer
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000
