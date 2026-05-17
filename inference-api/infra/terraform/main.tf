@@ -80,11 +80,12 @@ resource "google_container_node_pool" "inference" {
   }
 }
 
-# Static IP for the inference API LoadBalancer
+# Regional static IP for the inference API LoadBalancer Service
 
 
-resource "google_compute_global_address" "inference_api" {
+resource "google_compute_address" "inference_api" {
   name = "infergrid-inference-api-ip"
+  region = var.region
 }
 
 

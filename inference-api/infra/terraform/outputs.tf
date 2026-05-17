@@ -11,7 +11,7 @@ output "cluster_endpoint" {
 
 output "inference_api_ip" {
   description = "Static IP for the inference API LoadBalancer"
-  value       = google_compute_global_address.inference_api.address
+  value       = google_compute_address.inference_api.address
 }
 
 output "artifact_registry_url" {
