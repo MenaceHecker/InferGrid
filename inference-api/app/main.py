@@ -18,23 +18,17 @@ from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.schemas import PredictRequest, PredictResponse
 
+# ---------------------------------------------------------------------------
 # App state
-
+# ---------------------------------------------------------------------------
 _model: OnnxLoader | SklearnLoader | None = None
 _model_backend: str = "none"
 
-# Warm-up probe text, hort and unambiguous, fast to classify.
 _READINESS_PROBE_TEXT = "science space rocket"
-
-# /ready will return 503 if inference takes longer than this.
 _READINESS_TIMEOUT_MS = 500
 
 
 def _load_model(model_path: str) -> tuple[OnnxLoader | SklearnLoader, str]:
-    """
-    Load ONNX model if path ends in .onnx, otherwise fall back to sklearn.
-    Returns (loader_instance, backend_name).
-    """
     start = time.monotonic()
     if model_path.endswith(".onnx"):
         classes = _get_classes(model_path)
@@ -49,10 +43,6 @@ def _load_model(model_path: str) -> tuple[OnnxLoader | SklearnLoader, str]:
 
 
 def _get_classes(onnx_path: str) -> list[str]:
-    """
-    Resolve class labels for the ONNX model.
-    Looks for a sibling .pkl file first; falls back to 20 Newsgroups order.
-    """
     pkl_path = Path(onnx_path).with_suffix(".pkl")
     if pkl_path.exists():
         with open(pkl_path, "rb") as f:
@@ -85,7 +75,6 @@ def _get_classes(onnx_path: str) -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[type-arg]
-    """Load model at startup, release at shutdown."""
     global _model, _model_backend
     model_path = os.environ.get("MODEL_PATH", "models/classifier.onnx")
     _model, _model_backend = _load_model(model_path)
@@ -103,10 +92,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Prometheus metrics scrape endpoint
 app.mount("/metrics", metrics_app)
 
 
-# Routes
+# ---------------------------------------------------------------------------
+# Middleware - instrument every request with count + latency
+# ---------------------------------------------------------------------------
 
 
 @app.middleware("http")
@@ -120,18 +112,19 @@ async def track_requests(request: Request, call_next: Any) -> Response:
         endpoint=request.url.path,
         status_code=str(response.status_code),
     ).inc()
+
     REQUEST_LATENCY.labels(endpoint=request.url.path).observe(elapsed)
 
     return response
 
 
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    """
-    Liveness probe. Returns 200 as long as the process is alive.
-    Does NOT verify model performance, that is /ready's job.
-    Kubernetes restarts the pod if this stops returning 200.
-    """
     return {
         "status": "ok",
         "model_loaded": _model is not None,
@@ -141,15 +134,6 @@ async def health() -> dict[str, Any]:
 
 @app.get("/ready")
 async def ready() -> dict[str, Any]:
-    """
-    Readiness probe. Returns 200 only when:
-      1. The model is loaded.
-      2. A test inference completes within _READINESS_TIMEOUT_MS.
-
-    Kubernetes will not route traffic to this pod until this passes.
-    If inference degrades past the timeout, the pod is pulled from rotation
-    without being restarted (unlike a failed liveness probe).
-    """
     if _model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
@@ -175,15 +159,12 @@ async def ready() -> dict[str, Any]:
 
 @app.post("/predict", response_model=PredictResponse)
 async def predict(body: PredictRequest) -> PredictResponse:
-    """
-    Classify text using the loaded model (ONNX by default).
-    Returns predicted class label and confidence score.
-    """
     if _model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     prediction, confidence = _model.predict(body.text)
     PREDICTION_CONFIDENCE.observe(confidence)
+
     return PredictResponse(
         prediction=prediction,
         confidence=confidence,
