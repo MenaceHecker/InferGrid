@@ -5,8 +5,8 @@ Uses a tiny in-memory mock model so tests run without a real .pkl file.
 
 import app.main as main_module
 import pytest
-from app.metrics import MODEL_LOAD_TIME
 from app.main import app
+from app.metrics import MODEL_LOAD_TIME
 from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
