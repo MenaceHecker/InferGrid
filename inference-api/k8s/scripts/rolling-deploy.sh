@@ -6,6 +6,19 @@ IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/infergrid"
 IMAGE="${REGISTRY}/inference-api:${IMAGE_TAG}"
 ENDPOINT="${ENDPOINT:-http://35.255.145.27}"   # replace with your static IP
+GCLOUD_BIN_DIR="$(gcloud info --format='value(installation.sdk_root)' 2>/dev/null)/bin"
+
+if [[ -d "$GCLOUD_BIN_DIR" ]]; then
+  export PATH="$GCLOUD_BIN_DIR:$PATH"
+fi
+
+for command in gcloud docker kubectl gke-gcloud-auth-plugin curl; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "Missing required command: $command" >&2
+    echo "Install it, then rerun this script." >&2
+    exit 1
+  fi
+done
 
 echo "==> Rolling deploy: $IMAGE"
 echo "    Endpoint under test: $ENDPOINT"
@@ -14,8 +27,11 @@ echo "    Endpoint under test: $ENDPOINT"
 
 echo "==> Building and pushing image"
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-docker build -t "$IMAGE" inference-api/
-docker push "$IMAGE"
+docker buildx build \
+  --platform linux/amd64 \
+  --tag "$IMAGE" \
+  --push \
+  inference-api/
 
 # 2. Start background health checker so logs any non-200 during rollout
 
@@ -38,6 +54,11 @@ echo "==> Starting continuous health checks (logging to $HEALTH_LOG)"
   done
 ) &
 CHECKER_PID=$!
+cleanup() {
+  kill "$CHECKER_PID" 2>/dev/null || true
+  wait "$CHECKER_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 # 3. Trigger the rolling update
 
@@ -53,11 +74,11 @@ kubectl rollout status deployment/inference-api \
 
 # 4. Stop health checker and report results
 
-kill "$CHECKER_PID" 2>/dev/null || true
-wait "$CHECKER_PID" 2>/dev/null || true
+cleanup
+trap - EXIT
 
 TOTAL_CHECKS=$(wc -l < "$HEALTH_LOG" | tr -d ' ')
-FAILURES=$(grep -c "FAIL" "$HEALTH_LOG" 2>/dev/null || echo 0)
+FAILURES=$(grep -c "FAIL" "$HEALTH_LOG" 2>/dev/null || true)
 
 echo ""
 echo "=============================="
