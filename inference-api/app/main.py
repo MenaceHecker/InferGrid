@@ -5,8 +5,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 
+from app.metrics import (
+    MODEL_LOAD_TIME,
+    PREDICTION_CONFIDENCE,
+    REQUEST_COUNT,
+    REQUEST_LATENCY,
+    metrics_app,
+)
 from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.schemas import PredictRequest, PredictResponse
@@ -28,13 +35,17 @@ def _load_model(model_path: str) -> tuple[OnnxLoader | SklearnLoader, str]:
     Load ONNX model if path ends in .onnx, otherwise fall back to sklearn.
     Returns (loader_instance, backend_name).
     """
+    start = time.monotonic()
     if model_path.endswith(".onnx"):
         classes = _get_classes(model_path)
         loader = OnnxLoader(model_path, classes)
-        return loader, "onnx"
+        backend = "onnx"
     else:
         loader = SklearnLoader(model_path)
-        return loader, "sklearn"
+        backend = "sklearn"
+
+    MODEL_LOAD_TIME.set(time.monotonic() - start)
+    return loader, backend
 
 
 def _get_classes(onnx_path: str) -> list[str]:
@@ -92,8 +103,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.mount("/metrics", metrics_app)
+
 
 # Routes
+
+
+@app.middleware("http")
+async def track_requests(request: Request, call_next: Any) -> Response:
+    start = time.monotonic()
+    response = await call_next(request)
+    elapsed = time.monotonic() - start
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status_code=str(response.status_code),
+    ).inc()
+    REQUEST_LATENCY.labels(endpoint=request.url.path).observe(elapsed)
+
+    return response
 
 
 @app.get("/health")
@@ -144,12 +173,6 @@ async def ready() -> dict[str, Any]:
     }
 
 
-@app.get("/metrics")
-async def metrics() -> dict[str, Any]:
-    """Placeholder, replaced by prometheus-client exposition in Phase 3."""
-    return {"metrics": "not yet instrumented"}
-
-
 @app.post("/predict", response_model=PredictResponse)
 async def predict(body: PredictRequest) -> PredictResponse:
     """
@@ -160,6 +183,7 @@ async def predict(body: PredictRequest) -> PredictResponse:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     prediction, confidence = _model.predict(body.text)
+    PREDICTION_CONFIDENCE.observe(confidence)
     return PredictResponse(
         prediction=prediction,
         confidence=confidence,

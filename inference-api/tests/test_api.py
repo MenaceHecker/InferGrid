@@ -5,6 +5,7 @@ Uses a tiny in-memory mock model so tests run without a real .pkl file.
 
 import app.main as main_module
 import pytest
+from app.metrics import MODEL_LOAD_TIME
 from app.main import app
 from fastapi.testclient import TestClient
 
@@ -64,6 +65,49 @@ def test_health_reports_model_not_loaded(monkeypatch):
 def test_metrics_returns_200():
     response = client.get("/metrics")
     assert response.status_code == 200
+
+
+def test_metrics_exposes_required_metric_names():
+    response = client.get("/metrics")
+    body = response.text
+    assert "http_requests_total" in body
+    assert "request_latency_seconds" in body
+    assert "prediction_confidence" in body
+    assert "model_load_time_seconds" in body
+
+
+def test_request_metrics_record_health_request():
+    response = client.get("/health")
+    assert response.status_code == 200
+
+    metrics_response = client.get("/metrics")
+    body = metrics_response.text
+    assert 'http_requests_total{endpoint="/health",method="GET",status_code="200"}' in body
+    assert 'request_latency_seconds_count{endpoint="/health"}' in body
+
+
+def test_prediction_confidence_metric_records_prediction():
+    response = client.post("/predict", json={"text": "NASA launched a new rocket today."})
+    assert response.status_code == 200
+
+    metrics_response = client.get("/metrics")
+    body = metrics_response.text
+    assert 'prediction_confidence_bucket{le="0.9"}' in body
+    assert "prediction_confidence_count" in body
+
+
+def test_model_load_time_metric_records_loader_duration(monkeypatch):
+    class StubSklearnLoader:
+        def __init__(self, model_path: str) -> None:
+            self.model_path = model_path
+
+    monkeypatch.setattr(main_module, "SklearnLoader", StubSklearnLoader)
+
+    loader, backend = main_module._load_model("models/classifier.pkl")
+
+    assert isinstance(loader, StubSklearnLoader)
+    assert backend == "sklearn"
+    assert MODEL_LOAD_TIME._value.get() >= 0
 
 
 # ---------------------------------------------------------------------------
