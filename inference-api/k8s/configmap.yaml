@@ -7,7 +7,7 @@ data:
   # Path inside the container where the model file lives.
   # For local kind testing this is baked into the Docker image.
   # For GCP, mount a Cloud Storage volume or use an init container to pull.
-  MODEL_PATH: "/app/models/newsgroups_model.pkl"
+  MODEL_PATH: "/app/models/classifier.pkl"
 
   # "sklearn" or "onnx" so it switches the loader in app/models/
   MODEL_BACKEND: "sklearn"

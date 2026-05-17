@@ -16,15 +16,29 @@ IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/infergrid"
 IMAGE="${REGISTRY}/inference-api:${IMAGE_TAG}"
 K8S_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+GCLOUD_BIN_DIR="$(gcloud info --format='value(installation.sdk_root)' 2>/dev/null)/bin"
+
+if [[ -d "$GCLOUD_BIN_DIR" ]]; then
+  export PATH="$GCLOUD_BIN_DIR:$PATH"
+fi
+
+for command in gcloud docker kubectl gke-gcloud-auth-plugin; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "Missing required command: $command" >&2
+    echo "Install it, then rerun this script." >&2
+    exit 1
+  fi
+done
 
 echo "==> Authenticating Docker with Artifact Registry"
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
 echo "==> Building image: $IMAGE"
-docker build -t "$IMAGE" "$(cd "$K8S_DIR/.." && pwd)"
-
-echo "==> Pushing image to Artifact Registry"
-docker push "$IMAGE"
+docker buildx build \
+  --platform linux/amd64 \
+  --tag "$IMAGE" \
+  --push \
+  "$(cd "$K8S_DIR/.." && pwd)"
 
 echo "==> Fetching GKE credentials"
 gcloud container clusters get-credentials infergrid \
@@ -42,10 +56,12 @@ kubectl create secret generic inference-api-secret \
   --from-literal=API_KEY="$API_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# Update the image in the deployment
+# Apply the deployment, then replace the placeholder image with this build.
+kubectl apply -f "$K8S_DIR/deployment.yaml"
 kubectl set image deployment/inference-api \
   inference-api="$IMAGE" \
-  -n infergrid 2>/dev/null || kubectl apply -f "$K8S_DIR/deployment.yaml"
+  -n infergrid
+kubectl rollout restart deployment/inference-api -n infergrid
 
 # Use LoadBalancer service on GKE (not NodePort)
 kubectl apply -f "$K8S_DIR/service-loadbalancer.yaml"

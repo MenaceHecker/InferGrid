@@ -32,6 +32,7 @@ COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 
 # Copy application code
 COPY app/ ./app/
+COPY models/ ./models/
 
 # Models directory — mount a volume here in production
 RUN mkdir -p /app/models && chown -R appuser:appgroup /app
