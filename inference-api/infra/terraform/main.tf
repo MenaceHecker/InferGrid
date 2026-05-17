@@ -10,9 +10,9 @@ terraform {
 
   # Remote state in GCS, this keeps state out of the repo.
   # Creating the bucket first:
-  #   gcloud storage buckets create gs://infergrid-prod-tfstate-tm2508 --location=us-central1
+  #   gcloud storage buckets create gs://infergrid-prod-tfstate --location=us-central1
   backend "gcs" {
-    bucket = "infergrid-prod-tfstate-tm2508"
+    bucket = "infergrid-prod-tfstate"
     prefix = "infergrid/state"
   }
 }
@@ -20,7 +20,7 @@ terraform {
 provider "google" {
   project     = var.project_id
   region      = var.region
-  credentials = file(var.credentials_file)
+  credentials = file(pathexpand(var.credentials_file))
 }
 
 # GKE Cluster
