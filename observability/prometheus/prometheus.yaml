@@ -1,18 +1,46 @@
 ---
+# Namespace for Prometheus and related observability components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+
+---
 # ClusterRole: allows Prometheus to discover and scrape pods/services
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: prometheus
+  labels:
+    app: prometheus
 rules:
-  - apiGroups: [""]
-    resources: [nodes, nodes/proxy, services, endpoints, pods]
-    verbs: [get, list, watch]
-  - apiGroups: [extensions, networking.k8s.io]
-    resources: [ingresses]
-    verbs: [get, list, watch]
-  - nonResourceURLs: [/metrics]
-    verbs: [get]
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
 
 ---
 apiVersion: v1
@@ -20,12 +48,16 @@ kind: ServiceAccount
 metadata:
   name: prometheus
   namespace: monitoring
+  labels:
+    app: prometheus
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: prometheus
+  labels:
+    app: prometheus
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -43,6 +75,8 @@ kind: ConfigMap
 metadata:
   name: prometheus-config
   namespace: monitoring
+  labels:
+    app: prometheus
 data:
   prometheus.yml: |
     global:
@@ -59,7 +93,7 @@ data:
       # Scrape Prometheus itself
       - job_name: prometheus
         static_configs:
-          - targets: [localhost:9090]
+          - targets: ["localhost:9090"]
 
       # Kubernetes pod discovery — picks up any pod with
       # prometheus.io/scrape: "true" annotation
@@ -72,13 +106,7 @@ data:
             action: keep
             regex: "true"
           # Use the port from the annotation if set
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
-            action: replace
-            target_label: __address__
-            regex: (.+)
-            replacement: ${1}
-          - source_labels:
-              [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
             action: replace
             regex: ([^:]+)(?::\d+)?;(\d+)
             replacement: $1:$2
@@ -97,12 +125,14 @@ data:
             target_label: app
 
 ---
-# Alert rules — KS-statistic threshold wired up in Phase 3 Day 20
+# Alert rules for inference-api service health and model drift.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-alert-rules
   namespace: monitoring
+  labels:
+    app: prometheus
 data:
   alert-rules.yml: |
     groups:
@@ -145,6 +175,8 @@ kind: Deployment
 metadata:
   name: prometheus
   namespace: monitoring
+  labels:
+    app: prometheus
 spec:
   replicas: 1
   selector:
@@ -163,7 +195,7 @@ spec:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time=7d
-            - --web.enable-lifecycle        # allows hot config reload via POST /-/reload
+            - --web.enable-lifecycle
           ports:
             - containerPort: 9090
               name: http
