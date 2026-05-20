@@ -1,0 +1,132 @@
+{
+  "title": "InferGrid Drift Monitor",
+  "uid": "infergrid-drift-monitor",
+  "timezone": "browser",
+  "refresh": "60s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "KS-Statistic Over Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 18, "h": 10 },
+      "description": "Kolmogorov-Smirnov statistic comparing live confidence distribution vs baseline. Values above 0.15 indicate significant drift.",
+      "targets": [
+        {
+          "expr": "model_drift_ks_statistic",
+          "legendFormat": "KS statistic"
+        },
+        {
+          "expr": "vector(0.15)",
+          "legendFormat": "drift threshold"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "custom": { "lineWidth": 2 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "drift threshold" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } },
+              { "id": "custom.lineWidth", "value": 1 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "KS statistic" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Drift Status",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "expr": "model_drift_ks_statistic",
+          "legendFormat": "KS"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.10 },
+              { "color": "red", "value": 0.15 }
+            ]
+          },
+          "mappings": [
+            { "type": "range", "options": { "from": 0, "to": 0.10, "result": { "text": "NORMAL" } } },
+            { "type": "range", "options": { "from": 0.10, "to": 0.15, "result": { "text": "WARNING" } } },
+            { "type": "range", "options": { "from": 0.15, "to": 1, "result": { "text": "DRIFT DETECTED" } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Samples in Last Window",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 5, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "expr": "model_drift_window_size",
+          "legendFormat": "samples"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 4,
+      "title": "Live Confidence Distribution (last 5m)",
+      "type": "bargauge",
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 8 },
+      "description": "Current distribution of confidence scores. Compare visually against baseline — a healthy model peaks in the 0.8-1.0 buckets.",
+      "targets": [
+        {
+          "expr": "sum(increase(prediction_confidence_bucket[5m])) by (le)",
+          "legendFormat": "le={{le}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 5,
+      "title": "Drift Events (KS > 0.15)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 8 },
+      "description": "Each spike above the threshold line is a drift event. Persistent drift means the model should be retrained or swapped.",
+      "targets": [
+        {
+          "expr": "model_drift_ks_statistic > bool 0.15",
+          "legendFormat": "drift event (1=active)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 20 },
+          "color": { "fixedColor": "red", "mode": "fixed" }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39
+}
