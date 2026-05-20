@@ -1,0 +1,142 @@
+{
+  "title": "InferGrid Model Performance",
+  "uid": "infergrid-model-performance",
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Latency Percentiles — /predict",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 16, "h": 9 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(request_latency_seconds_bucket{endpoint='/predict'}[2m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(request_latency_seconds_bucket{endpoint='/predict'}[2m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_latency_seconds_bucket{endpoint='/predict'}[2m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "p50" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Current p95 Latency",
+      "type": "gauge",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 9 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(request_latency_seconds_bucket{endpoint='/predict'}[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Inference Throughput (RPS)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{endpoint='/predict', status_code='200'}[2m]))",
+          "legendFormat": "successful predictions/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 4,
+      "title": "Prediction Confidence Distribution",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(prediction_confidence_bucket[5m])) by (le)",
+          "legendFormat": "le={{le}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "description": "A healthy model clusters near le=1.0. Drift appears as spread toward lower buckets."
+    },
+    {
+      "id": 5,
+      "title": "Model Load Time (seconds)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 17, "w": 8, "h": 4 },
+      "targets": [
+        {
+          "expr": "model_load_time_seconds",
+          "legendFormat": "load time"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 6,
+      "title": "4xx Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 17, "w": 8, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{endpoint='/predict', status_code=~'4..'}[2m]))",
+          "legendFormat": "4xx/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 7,
+      "title": "Backend",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 17, "w": 8, "h": 4 },
+      "targets": [
+        {
+          "expr": "count by (model_backend) (http_requests_total{endpoint='/predict'})",
+          "legendFormat": "{{model_backend}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    }
+  ],
+  "schemaVersion": 39
+}
