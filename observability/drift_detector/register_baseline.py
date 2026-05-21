@@ -16,7 +16,6 @@ collects the confidence scores, and saves them as a numpy array.
 """
 
 import argparse
-import json
 import time
 
 import numpy as np
