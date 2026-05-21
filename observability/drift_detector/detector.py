@@ -76,8 +76,7 @@ def load_baseline(path: str) -> np.ndarray:
     """
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f"Baseline file not found: {path}. "
-            "Run register_baseline.py after deploying the model."
+            f"Baseline file not found: {path}. Run register_baseline.py after deploying the model."
         )
     baseline = np.load(path)
     log.info("Loaded baseline: %d samples, mean=%.4f", len(baseline), baseline.mean())
@@ -166,9 +165,7 @@ def run_detector(baseline: np.ndarray) -> None:
             live = fetch_live_samples(PROMETHEUS_URL, WINDOW_SECONDS, WINDOW_SAMPLES)
 
             if len(live) < 30:
-                log.info(
-                    "Not enough live samples (%d < 30) — skipping KS test", len(live)
-                )
+                log.info("Not enough live samples (%d < 30) — skipping KS test", len(live))
                 WINDOW_SIZE.set(len(live))
                 time.sleep(POLL_INTERVAL)
                 continue
