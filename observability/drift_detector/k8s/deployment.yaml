@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drift-detector
+  namespace: monitoring
+  labels:
+    app: drift-detector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drift-detector
+  template:
+    metadata:
+      labels:
+        app: drift-detector
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: drift-detector
+          image: gcr.io/YOUR_PROJECT_ID/drift-detector:latest
+          env:
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.monitoring.svc.cluster.local:9090"
+            - name: BASELINE_PATH
+              value: "/app/baseline.npy"
+            - name: DRIFT_THRESHOLD
+              value: "0.15"
+            - name: WINDOW_SECONDS
+              value: "3600"
+            - name: WINDOW_SAMPLES
+              value: "500"
+            - name: POLL_INTERVAL
+              value: "60"
+            - name: PORT
+              value: "9091"
+          ports:
+            - containerPort: 9091
+              name: metrics
+          volumeMounts:
+            - name: baseline
+              mountPath: /app/baseline.npy
+              subPath: baseline.npy
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+      volumes:
+        - name: baseline
+          configMap:
+            name: drift-baseline
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drift-detector
+  namespace: monitoring
+spec:
+  selector:
+    app: drift-detector
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: 9091
