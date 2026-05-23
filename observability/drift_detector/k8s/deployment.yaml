@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: drift-detector
-          image: gcr.io/YOUR_PROJECT_ID/drift-detector:latest
+          image: us-central1-docker.pkg.dev/infergrid-prod/infergrid/drift-detector:latest
           env:
             - name: PROMETHEUS_URL
               value: "http://prometheus.monitoring.svc.cluster.local:9090"
