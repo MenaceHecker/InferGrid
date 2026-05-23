@@ -4,10 +4,8 @@ No network calls so all Prometheus fetching is monkeypatched.
 """
 
 import numpy as np
-import pytest
 
 from observability.drift_detector.detector import compute_ks, fetch_live_samples
-
 
 # compute_ks
 
