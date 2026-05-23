@@ -21,8 +21,8 @@ def test_ks_identical_distributions_returns_low_statistic():
 
 def test_ks_different_distributions_returns_high_statistic():
     rng = np.random.default_rng(42)
-    baseline = rng.uniform(0.8, 1.0, 500)   # healthy: high confidence
-    drifted = rng.uniform(0.0, 0.5, 500)    # drifted: low confidence
+    baseline = rng.uniform(0.8, 1.0, 500)  # healthy: high confidence
+    drifted = rng.uniform(0.0, 0.5, 500)  # drifted: low confidence
     ks_stat, _ = compute_ks(baseline, drifted)
     assert ks_stat > 0.15
 
@@ -55,6 +55,7 @@ def test_ks_drift_threshold_boundary():
     # Not asserting exact value so just that it's in a reasonable range
     assert 0.0 < ks_stat < 1.0
 
+
 # fetch_live_samples monkeypatched
 
 
@@ -64,13 +65,7 @@ def _mock_prometheus_response(values: list[float]):
 
     now = time.time()
     return {
-        "data": {
-            "result": [
-                {
-                    "values": [[now - i * 10, str(v)] for i, v in enumerate(values)]
-                }
-            ]
-        }
+        "data": {"result": [{"values": [[now - i * 10, str(v)] for i, v in enumerate(values)]}]}
     }
 
 
