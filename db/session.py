@@ -10,7 +10,7 @@ DATABASE_URL = os.environ.get(
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,       # reconnect on stale connections
+    pool_pre_ping=True,  # reconnect on stale connections
     pool_size=5,
     max_overflow=10,
 )

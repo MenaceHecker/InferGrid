@@ -28,13 +28,14 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 class Base(DeclarativeBase):
     pass
 
+
 # models
 
 
-class ModelStatus(str, enum.Enum):
-    staging = "staging"      # registered but not yet serving traffic
-    active = "active"        # currently serving production traffic
-    retired = "retired"      # no longer in use
+class ModelStatus(enum.StrEnum):
+    staging = "staging"  # registered but not yet serving traffic
+    active = "active"  # currently serving production traffic
+    retired = "retired"  # no longer in use
 
 
 class ModelRecord(Base):
@@ -92,6 +93,7 @@ class EvaluationRecord(Base):
             f"<EvaluationRecord model_id={self.model_id} "
             f"{self.metric_name}={self.metric_value:.4f}>"
         )
+
 
 # ab_configs
 
