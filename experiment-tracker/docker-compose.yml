@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: infergrid
+      POSTGRES_PASSWORD: infergrid
+      POSTGRES_DB: infergrid
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infergrid"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  experiment-tracker:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://infergrid:infergrid@postgres:5432/infergrid
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
