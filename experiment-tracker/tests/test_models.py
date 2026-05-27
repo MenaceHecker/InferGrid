@@ -4,10 +4,9 @@ Uses SQLite in-memory so no real PostgreSQL is needed in CI.
 """
 
 import pytest
+from db.models import ABConfig, Base, EvaluationRecord, ModelRecord, ModelStatus
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from db.models import ABConfig, Base, EvaluationRecord, ModelRecord, ModelStatus
 
 
 @pytest.fixture
@@ -23,8 +22,8 @@ def db():
     session.close()
     Base.metadata.drop_all(engine)
 
-# ModelRecord
 
+# ModelRecord
 
 
 def test_create_model_record(db):
@@ -101,20 +100,24 @@ def test_evaluation_unique_constraint(db):
     db.add(model)
     db.commit()
 
-    db.add(EvaluationRecord(
-        model_id=model.id,
-        metric_name="accuracy",
-        metric_value=0.9,
-        dataset_hash="f" * 64,
-    ))
+    db.add(
+        EvaluationRecord(
+            model_id=model.id,
+            metric_name="accuracy",
+            metric_value=0.9,
+            dataset_hash="f" * 64,
+        )
+    )
     db.commit()
 
-    db.add(EvaluationRecord(
-        model_id=model.id,
-        metric_name="accuracy",
-        metric_value=0.95,
-        dataset_hash="f" * 64,
-    ))
+    db.add(
+        EvaluationRecord(
+            model_id=model.id,
+            metric_name="accuracy",
+            metric_value=0.95,
+            dataset_hash="f" * 64,
+        )
+    )
     with pytest.raises(IntegrityError):
         db.commit()
 
@@ -124,17 +127,20 @@ def test_evaluation_cascade_delete(db):
     db.add(model)
     db.commit()
 
-    db.add(EvaluationRecord(
-        model_id=model.id,
-        metric_name="f1",
-        metric_value=0.88,
-        dataset_hash="h" * 64,
-    ))
+    db.add(
+        EvaluationRecord(
+            model_id=model.id,
+            metric_name="f1",
+            metric_value=0.88,
+            dataset_hash="h" * 64,
+        )
+    )
     db.commit()
 
     db.delete(model)
     db.commit()
     assert db.query(EvaluationRecord).count() == 0
+
 
 # ABConfig
 

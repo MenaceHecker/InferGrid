@@ -71,6 +71,7 @@ class ABConfigResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 # A/B compare
 
 

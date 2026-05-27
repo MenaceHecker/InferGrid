@@ -4,23 +4,19 @@ Uses SQLite in-memory so no real PostgreSQL needed in CI.
 """
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from api.main import app
 from db.models import Base, EvaluationRecord, ModelRecord, ModelStatus
 from db.session import get_db
-
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 # Fixtures
 
 
 @pytest.fixture
 def db_session():
-    engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
-    )
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -52,12 +48,28 @@ def two_models(db_session):
 def two_models_with_metrics(db_session, two_models):
     """Seed evaluation metrics for both models."""
     model_a, model_b = two_models
-    db_session.add_all([
-        EvaluationRecord(model_id=model_a.id, metric_name="accuracy", metric_value=0.91, dataset_hash="d" * 64),
-        EvaluationRecord(model_id=model_a.id, metric_name="f1", metric_value=0.89, dataset_hash="d" * 64),
-        EvaluationRecord(model_id=model_b.id, metric_name="accuracy", metric_value=0.94, dataset_hash="d" * 64),
-        EvaluationRecord(model_id=model_b.id, metric_name="f1", metric_value=0.92, dataset_hash="d" * 64),
-    ])
+    db_session.add_all(
+        [
+            EvaluationRecord(
+                model_id=model_a.id,
+                metric_name="accuracy",
+                metric_value=0.91,
+                dataset_hash="d" * 64,
+            ),
+            EvaluationRecord(
+                model_id=model_a.id, metric_name="f1", metric_value=0.89, dataset_hash="d" * 64
+            ),
+            EvaluationRecord(
+                model_id=model_b.id,
+                metric_name="accuracy",
+                metric_value=0.94,
+                dataset_hash="d" * 64,
+            ),
+            EvaluationRecord(
+                model_id=model_b.id, metric_name="f1", metric_value=0.92, dataset_hash="d" * 64
+            ),
+        ]
+    )
     db_session.commit()
     return model_a, model_b
 
@@ -66,18 +78,24 @@ def two_models_with_metrics(db_session, two_models):
 
 
 def test_register_model_returns_201(client):
-    response = client.post("/models/register", json={
-        "name": "newsgroups-v1",
-        "version_hash": "a" * 64,
-    })
+    response = client.post(
+        "/models/register",
+        json={
+            "name": "newsgroups-v1",
+            "version_hash": "a" * 64,
+        },
+    )
     assert response.status_code == 201
 
 
 def test_register_model_response_shape(client):
-    response = client.post("/models/register", json={
-        "name": "newsgroups-v1",
-        "version_hash": "a" * 64,
-    })
+    response = client.post(
+        "/models/register",
+        json={
+            "name": "newsgroups-v1",
+            "version_hash": "a" * 64,
+        },
+    )
     body = response.json()
     assert "id" in body
     assert "name" in body
@@ -87,10 +105,13 @@ def test_register_model_response_shape(client):
 
 
 def test_register_model_default_status_is_staging(client):
-    response = client.post("/models/register", json={
-        "name": "newsgroups-v1",
-        "version_hash": "a" * 64,
-    })
+    response = client.post(
+        "/models/register",
+        json={
+            "name": "newsgroups-v1",
+            "version_hash": "a" * 64,
+        },
+    )
     assert response.json()["status"] == "staging"
 
 
@@ -107,10 +128,13 @@ def test_register_model_missing_name_returns_422(client):
 
 
 def test_register_model_short_hash_returns_422(client):
-    response = client.post("/models/register", json={
-        "name": "m",
-        "version_hash": "abc",
-    })
+    response = client.post(
+        "/models/register",
+        json={
+            "name": "m",
+            "version_hash": "abc",
+        },
+    )
     assert response.status_code == 422
 
 
@@ -147,20 +171,26 @@ def test_get_model_metrics_404_for_unknown_model(client):
 
 def test_configure_ab_returns_201(client, two_models):
     model_a, model_b = two_models
-    response = client.post("/ab/configure", json={
-        "model_a_id": model_a.id,
-        "model_b_id": model_b.id,
-        "split_weight": 0.7,
-    })
+    response = client.post(
+        "/ab/configure",
+        json={
+            "model_a_id": model_a.id,
+            "model_b_id": model_b.id,
+            "split_weight": 0.7,
+        },
+    )
     assert response.status_code == 201
 
 
 def test_configure_ab_is_active(client, two_models):
     model_a, model_b = two_models
-    response = client.post("/ab/configure", json={
-        "model_a_id": model_a.id,
-        "model_b_id": model_b.id,
-    })
+    response = client.post(
+        "/ab/configure",
+        json={
+            "model_a_id": model_a.id,
+            "model_b_id": model_b.id,
+        },
+    )
     assert response.json()["active"] is True
 
 
@@ -175,29 +205,38 @@ def test_configure_ab_deactivates_previous(client, two_models):
 
 def test_configure_ab_same_model_ids_returns_422(client, two_models):
     model_a, _ = two_models
-    response = client.post("/ab/configure", json={
-        "model_a_id": model_a.id,
-        "model_b_id": model_a.id,
-    })
+    response = client.post(
+        "/ab/configure",
+        json={
+            "model_a_id": model_a.id,
+            "model_b_id": model_a.id,
+        },
+    )
     assert response.status_code == 422
 
 
 def test_configure_ab_unknown_model_returns_404(client, two_models):
     model_a, _ = two_models
-    response = client.post("/ab/configure", json={
-        "model_a_id": model_a.id,
-        "model_b_id": 99999,
-    })
+    response = client.post(
+        "/ab/configure",
+        json={
+            "model_a_id": model_a.id,
+            "model_b_id": 99999,
+        },
+    )
     assert response.status_code == 404
 
 
 def test_configure_ab_split_weight_out_of_range_returns_422(client, two_models):
     model_a, model_b = two_models
-    response = client.post("/ab/configure", json={
-        "model_a_id": model_a.id,
-        "model_b_id": model_b.id,
-        "split_weight": 1.5,
-    })
+    response = client.post(
+        "/ab/configure",
+        json={
+            "model_a_id": model_a.id,
+            "model_b_id": model_b.id,
+            "split_weight": 1.5,
+        },
+    )
     assert response.status_code == 422
 
 
@@ -218,11 +257,14 @@ def test_get_active_ab_404_when_none_configured(client):
 
 def test_get_active_ab_returns_correct_split(client, two_models):
     model_a, model_b = two_models
-    client.post("/ab/configure", json={
-        "model_a_id": model_a.id,
-        "model_b_id": model_b.id,
-        "split_weight": 0.3,
-    })
+    client.post(
+        "/ab/configure",
+        json={
+            "model_a_id": model_a.id,
+            "model_b_id": model_b.id,
+            "split_weight": 0.3,
+        },
+    )
     body = client.get("/ab/active").json()
     assert body["split_weight"] == pytest.approx(0.3)
 
