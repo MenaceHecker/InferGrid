@@ -31,4 +31,10 @@ MODEL_LOAD_TIME = Gauge(
     "Wall-clock seconds to load the model at startup",
 )
 
+AB_ROUTING_COUNT = Counter(
+    "ab_routing_total",
+    "Total predictions routed per model version in A/B test",
+    ["model_version"],
+)
+
 metrics_app = make_asgi_app()
