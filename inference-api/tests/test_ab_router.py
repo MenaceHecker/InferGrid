@@ -1,6 +1,5 @@
 import pytest
 import requests
-
 from app.ab_router import RoutingDecision, get_active_ab_config, make_routing_decision
 
 # Sample A/B config fixture
