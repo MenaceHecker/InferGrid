@@ -7,7 +7,9 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
 
+from app.ab_router import get_active_ab_config, make_routing_decision
 from app.metrics import (
+    AB_ROUTING_COUNT,
     MODEL_LOAD_TIME,
     PREDICTION_CONFIDENCE,
     REQUEST_COUNT,
@@ -18,9 +20,7 @@ from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.schemas import PredictRequest, PredictResponse
 
-# ---------------------------------------------------------------------------
 # App state
-# ---------------------------------------------------------------------------
 _model: OnnxLoader | SklearnLoader | None = None
 _model_backend: str = "none"
 
@@ -50,26 +50,12 @@ def _get_classes(onnx_path: str) -> list[str]:
         return list(payload["classes"])
 
     return [
-        "alt.atheism",
-        "comp.graphics",
-        "comp.os.ms-windows.misc",
-        "comp.sys.ibm.pc.hardware",
-        "comp.sys.mac.hardware",
-        "comp.windows.x",
-        "misc.forsale",
-        "rec.autos",
-        "rec.motorcycles",
-        "rec.sport.baseball",
-        "rec.sport.hockey",
-        "sci.crypt",
-        "sci.electronics",
-        "sci.med",
-        "sci.space",
-        "soc.religion.christian",
-        "talk.politics.guns",
-        "talk.politics.mideast",
-        "talk.politics.misc",
-        "talk.religion.misc",
+        "alt.atheism", "comp.graphics", "comp.os.ms-windows.misc",
+        "comp.sys.ibm.pc.hardware", "comp.sys.mac.hardware", "comp.windows.x",
+        "misc.forsale", "rec.autos", "rec.motorcycles", "rec.sport.baseball",
+        "rec.sport.hockey", "sci.crypt", "sci.electronics", "sci.med",
+        "sci.space", "soc.religion.christian", "talk.politics.guns",
+        "talk.politics.mideast", "talk.politics.misc", "talk.religion.misc",
     ]
 
 
@@ -92,14 +78,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Prometheus metrics scrape endpoint
 app.mount("/metrics", metrics_app)
 
-
-# ---------------------------------------------------------------------------
-# Middleware - instrument every request with count + latency
-# ---------------------------------------------------------------------------
-
+# Middleware
 
 @app.middleware("http")
 async def track_requests(request: Request, call_next: Any) -> Response:
@@ -117,10 +98,7 @@ async def track_requests(request: Request, call_next: Any) -> Response:
 
     return response
 
-
-# ---------------------------------------------------------------------------
 # Routes
-# ---------------------------------------------------------------------------
 
 
 @app.get("/health")
@@ -162,6 +140,19 @@ async def predict(body: PredictRequest) -> PredictResponse:
     if _model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
+    # A/B routing so falls back to primary if tracker is unreachable
+    config = get_active_ab_config()
+    decision = make_routing_decision(config)
+
+    AB_ROUTING_COUNT.labels(model_version=decision.model_version).inc()
+
+    import logging
+    logging.getLogger(__name__).info(
+        "predict routed to %s (model_id=%s)",
+        decision.model_version,
+        decision.model_id,
+    )
+
     prediction, confidence = _model.predict(body.text)
     PREDICTION_CONFIDENCE.observe(confidence)
 
@@ -169,4 +160,5 @@ async def predict(body: PredictRequest) -> PredictResponse:
         prediction=prediction,
         confidence=confidence,
         model_backend=_model_backend,
+        model_version=decision.model_version,
     )
