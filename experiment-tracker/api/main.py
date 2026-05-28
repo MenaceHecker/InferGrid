@@ -83,10 +83,7 @@ def get_model_metrics(
 
     return ModelMetricsResponse(
         model=ModelResponse.model_validate(model),
-        evaluations=[
-            EvaluationResponse.model_validate(e)
-            for e in model.evaluations
-        ],
+        evaluations=[EvaluationResponse.model_validate(e) for e in model.evaluations],
     )
 
 

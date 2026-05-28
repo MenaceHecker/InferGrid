@@ -50,12 +50,26 @@ def _get_classes(onnx_path: str) -> list[str]:
         return list(payload["classes"])
 
     return [
-        "alt.atheism", "comp.graphics", "comp.os.ms-windows.misc",
-        "comp.sys.ibm.pc.hardware", "comp.sys.mac.hardware", "comp.windows.x",
-        "misc.forsale", "rec.autos", "rec.motorcycles", "rec.sport.baseball",
-        "rec.sport.hockey", "sci.crypt", "sci.electronics", "sci.med",
-        "sci.space", "soc.religion.christian", "talk.politics.guns",
-        "talk.politics.mideast", "talk.politics.misc", "talk.religion.misc",
+        "alt.atheism",
+        "comp.graphics",
+        "comp.os.ms-windows.misc",
+        "comp.sys.ibm.pc.hardware",
+        "comp.sys.mac.hardware",
+        "comp.windows.x",
+        "misc.forsale",
+        "rec.autos",
+        "rec.motorcycles",
+        "rec.sport.baseball",
+        "rec.sport.hockey",
+        "sci.crypt",
+        "sci.electronics",
+        "sci.med",
+        "sci.space",
+        "soc.religion.christian",
+        "talk.politics.guns",
+        "talk.politics.mideast",
+        "talk.politics.misc",
+        "talk.religion.misc",
     ]
 
 
@@ -82,6 +96,7 @@ app.mount("/metrics", metrics_app)
 
 # Middleware
 
+
 @app.middleware("http")
 async def track_requests(request: Request, call_next: Any) -> Response:
     start = time.monotonic()
@@ -97,6 +112,7 @@ async def track_requests(request: Request, call_next: Any) -> Response:
     REQUEST_LATENCY.labels(endpoint=request.url.path).observe(elapsed)
 
     return response
+
 
 # Routes
 
@@ -147,6 +163,7 @@ async def predict(body: PredictRequest) -> PredictResponse:
     AB_ROUTING_COUNT.labels(model_version=decision.model_version).inc()
 
     import logging
+
     logging.getLogger(__name__).info(
         "predict routed to %s (model_id=%s)",
         decision.model_version,

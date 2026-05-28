@@ -34,8 +34,8 @@ TRACKER_TIMEOUT = float(os.environ.get("EXPERIMENT_TRACKER_TIMEOUT", "0.5"))
 
 @dataclass
 class RoutingDecision:
-    model_id: int | None      # None means no A/B config active
-    model_version: str        # "model_a" | "model_b" | "primary"
+    model_id: int | None  # None means no A/B config active
+    model_version: str  # "model_a" | "model_b" | "primary"
     split_weight: float | None
 
 
