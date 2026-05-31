@@ -1,6 +1,9 @@
+#!/usr/bin/env bash
+
 set -euo pipefail
  
 TRACKER_URL="${TRACKER_URL:-http://localhost:8001}"
+RUN_ID="${RUN_ID:-$(date +%s)-$$}"
 DATASET_HASH=$(echo -n "20newsgroups-test-v1" | sha256sum | awk '{print $1}')
  
 echo "==> Registering model A (newsgroups-sklearn-v1)"
@@ -8,7 +11,7 @@ MODEL_A=$(curl -sf -X POST "${TRACKER_URL}/models/register" \
   -H "Content-Type: application/json" \
   -d "{
     \"name\": \"newsgroups-sklearn-v1\",
-    \"version_hash\": \"$(echo -n 'sklearn-v1' | sha256sum | awk '{print $1}')\",
+    \"version_hash\": \"$(echo -n "sklearn-v1-${RUN_ID}" | sha256sum | awk '{print $1}')\",
     \"status\": \"active\"
   }")
 MODEL_A_ID=$(echo "$MODEL_A" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
@@ -19,7 +22,7 @@ MODEL_B=$(curl -sf -X POST "${TRACKER_URL}/models/register" \
   -H "Content-Type: application/json" \
   -d "{
     \"name\": \"newsgroups-onnx-v1\",
-    \"version_hash\": \"$(echo -n 'onnx-v1' | sha256sum | awk '{print $1}')\",
+    \"version_hash\": \"$(echo -n "onnx-v1-${RUN_ID}" | sha256sum | awk '{print $1}')\",
     \"status\": \"staging\"
   }")
 MODEL_B_ID=$(echo "$MODEL_B" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
