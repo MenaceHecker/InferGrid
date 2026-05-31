@@ -29,8 +29,8 @@ TRACKER_URL = os.environ.get("TRACKER_URL", "http://localhost:8001")
 INFERENCE_URL = os.environ.get("INFERENCE_URL", "http://localhost:8000")
 
 TOTAL_REQUESTS = 100
-SPLIT_WEIGHT = 0.6          # 60% model_a, 40% model_b
-TOLERANCE = 0.10            # allow ±10% deviation from configured ratio
+SPLIT_WEIGHT = 0.6  # 60% model_a, 40% model_b
+TOLERANCE = 0.10  # allow ±10% deviation from configured ratio
 
 DATASET_HASH = hashlib.sha256(b"20newsgroups-test-v1").hexdigest()
 
@@ -51,7 +51,6 @@ SAMPLE_TEXTS = [
 # Helpers
 
 
-
 def register_model(name: str, version_tag: str, status: str = "active") -> int:
     version_hash = hashlib.sha256(version_tag.encode()).hexdigest()
     resp = requests.post(
@@ -64,6 +63,7 @@ def register_model(name: str, version_tag: str, status: str = "active") -> int:
         detail = resp.json()["detail"]
         # Extract id from detail string "... (id=N)"
         import re
+
         match = re.search(r"id=(\d+)", detail)
         if match:
             return int(match.group(1))
@@ -111,7 +111,6 @@ def send_predict(text: str) -> dict:
 
 
 # Fixtures
-
 
 
 @pytest.fixture(scope="module")
@@ -190,6 +189,7 @@ def test_active_ab_endpoint_returns_config(ab_config):
     assert resp.status_code == 200
     assert resp.json()["active"] is True
 
+
 # Step 4 & 5: 100 requests — verify traffic split within ±10%
 
 
@@ -217,12 +217,9 @@ def test_traffic_split_within_tolerance(predict_results):
     model_b_count = sum(1 for r in predict_results if r["model_version"] == "model_b")
     primary_count = sum(1 for r in predict_results if r["model_version"] == "primary")
 
-    print(f"\n  model_a: {model_a_count}/{TOTAL_REQUESTS} "
-          f"({model_a_count / TOTAL_REQUESTS:.1%})")
-    print(f"  model_b: {model_b_count}/{TOTAL_REQUESTS} "
-          f"({model_b_count / TOTAL_REQUESTS:.1%})")
-    print(f"  primary: {primary_count}/{TOTAL_REQUESTS} "
-          f"(fallback — tracker unreachable)")
+    print(f"\n  model_a: {model_a_count}/{TOTAL_REQUESTS} ({model_a_count / TOTAL_REQUESTS:.1%})")
+    print(f"  model_b: {model_b_count}/{TOTAL_REQUESTS} ({model_b_count / TOTAL_REQUESTS:.1%})")
+    print(f"  primary: {primary_count}/{TOTAL_REQUESTS} (fallback — tracker unreachable)")
 
     if primary_count == TOTAL_REQUESTS:
         pytest.skip("All requests fell back to primary — is the Experiment Tracker running?")
@@ -236,6 +233,7 @@ def test_traffic_split_within_tolerance(predict_results):
         f"Traffic split {actual_ratio:.1%} outside [{lower:.0%}, {upper:.0%}] "
         f"(model_a={model_a_count}, model_b={model_b_count})"
     )
+
 
 # Step 6: /ab/compare returns correct side-by-side metrics
 
@@ -255,8 +253,7 @@ def test_ab_compare_model_b_has_lower_latency(ab_config):
     resp = requests.get(f"{TRACKER_URL}/ab/compare", timeout=5)
     body = resp.json()
     assert (
-        body["model_b"]["metrics"]["latency_p95_ms"]
-        < body["model_a"]["metrics"]["latency_p95_ms"]
+        body["model_b"]["metrics"]["latency_p95_ms"] < body["model_a"]["metrics"]["latency_p95_ms"]
     )
 
 
