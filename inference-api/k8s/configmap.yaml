@@ -4,16 +4,9 @@ metadata:
   name: inference-api-config
   namespace: infergrid
 data:
-  # Path inside the container where the model file lives.
-  # For local kind testing this is baked into the Docker image.
-  # For GCP, mount a Cloud Storage volume or use an init container to pull.
-  MODEL_PATH: "/app/models/classifier.pkl"
-
-  # "sklearn" or "onnx" so it switches the loader in app/models/
+  MODEL_PATH: "/app/models/newsgroups_model.pkl"
   MODEL_BACKEND: "sklearn"
-
-  # Max concurrent in-flight requests before Kafka queue kicks in (Phase 5).
   MAX_CONCURRENT_REQUESTS: "10"
-
-  # Log level for uvicorn
   LOG_LEVEL: "info"
+  EXPERIMENT_TRACKER_URL: "http://experiment-tracker.infergrid.svc.cluster.local:8001"
+  EXPERIMENT_TRACKER_TIMEOUT: "0.5"
