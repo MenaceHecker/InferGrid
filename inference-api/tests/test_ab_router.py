@@ -70,6 +70,7 @@ def test_routing_no_config_returns_primary():
     assert decision.model_id is None
     assert decision.split_weight is None
 
+
 # make_routing_decision — with config
 
 
@@ -113,9 +114,7 @@ def test_routing_split_approximates_configured_ratio(monkeypatch):
 
     config = {**SAMPLE_CONFIG, "split_weight": 0.6}
     model_a_count = sum(
-        1
-        for _ in range(10_000)
-        if make_routing_decision(config).model_version == "model_a"
+        1 for _ in range(10_000) if make_routing_decision(config).model_version == "model_a"
     )
     ratio = model_a_count / 10_000
     assert abs(ratio - 0.6) < 0.02
