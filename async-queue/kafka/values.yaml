@@ -1,0 +1,55 @@
+# async-queue/kafka/values.yaml
+# Bitnami Kafka Helm chart values for InferGrid.
+# Install with:
+#   helm repo add bitnami https://charts.bitnami.com/bitnami
+#   helm repo update
+#   helm install kafka bitnami/kafka \
+#     --namespace infergrid \
+#     --values async-queue/kafka/values.yaml
+
+replicaCount: 1       # single broker is enough for portfolio scale
+
+# KRaft mode (no ZooKeeper dependency, default in recent Bitnami chart)
+kraft:
+  enabled: true
+
+listeners:
+  client:
+    protocol: PLAINTEXT   # no TLS for internal cluster traffic
+  controller:
+    protocol: PLAINTEXT
+
+# Persistence is small disk for dev/portfolio
+persistence:
+  enabled: true
+  size: 8Gi
+
+# Resource limits sized for e2-standard-2 nodes
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# Expose inside the cluster only
+service:
+  type: ClusterIP
+
+# Pre-create topics on startup
+provisioning:
+  enabled: true
+  topics:
+    - name: infergrid.model-a.requests
+      partitions: 3
+      replicationFactor: 1
+      config:
+        retention.ms: "3600000"    # 1 hour retention
+        max.message.bytes: "1048576"
+    - name: infergrid.model-b.requests
+      partitions: 3
+      replicationFactor: 1
+      config:
+        retention.ms: "3600000"
+        max.message.bytes: "1048576"
