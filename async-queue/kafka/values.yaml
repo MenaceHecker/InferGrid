@@ -7,7 +7,14 @@
 #     --namespace infergrid \
 #     --values async-queue/kafka/values.yaml
 
-replicaCount: 1       # single broker is enough for portfolio scale
+global:
+  security:
+    # The Bitnami 4.0.0 image was moved from bitnami/ to bitnamilegacy/.
+    allowInsecureImages: true
+
+image:
+  repository: bitnamilegacy/kafka
+  tag: 4.0.0-debian-12-r10
 
 # KRaft mode (no ZooKeeper dependency, default in recent Bitnami chart)
 kraft:
@@ -19,19 +26,23 @@ listeners:
   controller:
     protocol: PLAINTEXT
 
-# Persistence is small disk for dev/portfolio
-persistence:
-  enabled: true
-  size: 8Gi
+# A single combined controller/broker is enough for portfolio scale.
+controller:
+  replicaCount: 1
+  controllerOnly: false
+  persistence:
+    enabled: true
+    size: 8Gi
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
 
-# Resource limits sized for e2-standard-2 nodes
-resources:
-  requests:
-    cpu: "250m"
-    memory: "512Mi"
-  limits:
-    cpu: "1000m"
-    memory: "1Gi"
+broker:
+  replicaCount: 0
 
 # Expose inside the cluster only
 service:

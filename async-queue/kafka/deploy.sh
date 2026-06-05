@@ -2,6 +2,7 @@ set -euo pipefail
 
 NAMESPACE="infergrid"
 RELEASE="kafka"
+CHART_VERSION="32.4.3"
 TOPICS=("infergrid.model-a.requests" "infergrid.model-b.requests")
 
 echo "==> Adding Bitnami Helm repo"
@@ -10,6 +11,7 @@ helm repo update
 
 echo "==> Installing/upgrading Kafka"
 helm upgrade --install "$RELEASE" bitnami/kafka \
+  --version "$CHART_VERSION" \
   --namespace "$NAMESPACE" \
   --values async-queue/kafka/values.yaml \
   --wait \
@@ -28,7 +30,7 @@ for topic in "${TOPICS[@]}"; do
       --bootstrap-server localhost:9092 \
       --describe \
       --topic "$topic" \
-    | grep -q "Topic: $topic" && echo "OK" || echo "MISSING"
+    | grep -F "Topic: $topic" >/dev/null && echo "OK" || echo "MISSING"
 done
 
 echo ""
