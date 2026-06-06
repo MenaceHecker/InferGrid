@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-worker
+  namespace: infergrid
+  labels:
+    app: inference-worker
+spec:
+  # Scale horizontally so each pod joins the same consumer group
+  # Kafka will rebalance partitions across replicas automatically
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inference-worker
+  template:
+    metadata:
+      labels:
+        app: inference-worker
+    spec:
+      containers:
+        - name: inference-worker
+          image: gcr.io/YOUR_PROJECT_ID/inference-worker:latest
+          env:
+            - name: KAFKA_BROKER
+              value: "kafka.infergrid.svc.cluster.local:9092"
+            - name: KAFKA_GROUP_ID
+              value: "infergrid-workers"
+            - name: REDIS_URL
+              value: "redis://redis.infergrid.svc.cluster.local:6379"
+            - name: MODEL_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: MODEL_PATH
+            - name: RESULT_TTL_SECONDS
+              value: "300"
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name   # pod name as worker ID
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            exec:
+              # Worker is alive if its process is running
+              command: ["python", "-c", "import os; os.kill(1, 0)"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
