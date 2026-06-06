@@ -1,0 +1,5 @@
+confluent-kafka>=2.3
+redis>=5.0
+scikit-learn>=1.4
+onnxruntime>=1.17
+numpy>=1.26
