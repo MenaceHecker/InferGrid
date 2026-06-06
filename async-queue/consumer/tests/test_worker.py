@@ -7,7 +7,6 @@ import json
 import time
 
 import pytest
-
 from async_queue.consumer.worker import (
     RESULT_TTL,
     process_message,
