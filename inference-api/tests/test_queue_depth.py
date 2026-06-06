@@ -32,9 +32,8 @@ def inject_mock_model(monkeypatch):
 def patch_ab_router(monkeypatch):
     """Disable real Experiment Tracker calls in all tests."""
     from app.ab_router import RoutingDecision
-    monkeypatch.setattr(
-        "app.main.get_active_ab_config", lambda: None
-    )
+
+    monkeypatch.setattr("app.main.get_active_ab_config", lambda: None)
     monkeypatch.setattr(
         "app.main.make_routing_decision",
         lambda _: RoutingDecision(model_id=None, model_version="primary", split_weight=None),
@@ -81,6 +80,7 @@ def test_predict_sync_no_job_id_below_threshold(monkeypatch):
     body = client.post("/predict", json={"text": "Some input text"}).json()
     assert "job_id" not in body
 
+
 # Async path at or above threshold
 
 
@@ -123,6 +123,7 @@ def test_predict_async_enqueue_carries_model_version(monkeypatch, mock_enqueue):
     monkeypatch.setattr(main_module, "_MAX_CONCURRENT", 10)
     client.post("/predict", json={"text": "Some text"})
     assert mock_enqueue[0]["model_version"] == "primary"
+
 
 # Threshold boundary
 

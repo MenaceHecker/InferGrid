@@ -40,13 +40,15 @@ _producer: KafkaProducer | None = None
 def get_producer() -> KafkaProducer:
     global _producer
     if _producer is None:
-        _producer = KafkaProducer({
-            "bootstrap.servers": KAFKA_BROKER,
-            "acks": "1",                  # leader ack only so low latency
-            "retries": 3,
-            "retry.backoff.ms": 100,
-            "delivery.timeout.ms": 5000,
-        })
+        _producer = KafkaProducer(
+            {
+                "bootstrap.servers": KAFKA_BROKER,
+                "acks": "1",  # leader ack only so low latency
+                "retries": 3,
+                "retry.backoff.ms": 100,
+                "delivery.timeout.ms": 5000,
+            }
+        )
     return _producer
 
 
@@ -73,12 +75,14 @@ def enqueue_job(job_id: str, text: str, model_version: str) -> str:
     Raises RuntimeError if the producer cannot deliver within timeout.
     """
     topic = _topic_for(model_version)
-    payload = json.dumps({
-        "job_id": job_id,
-        "text": text,
-        "model_version": model_version,
-        "enqueued_at": time.time(),
-    })
+    payload = json.dumps(
+        {
+            "job_id": job_id,
+            "text": text,
+            "model_version": model_version,
+            "enqueued_at": time.time(),
+        }
+    )
 
     producer = get_producer()
     producer.produce(

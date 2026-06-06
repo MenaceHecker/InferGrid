@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 import time
@@ -21,8 +22,6 @@ from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.producer import enqueue_job
 from app.schemas import EnqueuedResponse, PredictRequest, PredictResponse
-
-import logging
 
 log = logging.getLogger(__name__)
 
@@ -57,12 +56,26 @@ def _get_classes(onnx_path: str) -> list[str]:
             payload = pickle.load(f)
         return list(payload["classes"])
     return [
-        "alt.atheism", "comp.graphics", "comp.os.ms-windows.misc",
-        "comp.sys.ibm.pc.hardware", "comp.sys.mac.hardware", "comp.windows.x",
-        "misc.forsale", "rec.autos", "rec.motorcycles", "rec.sport.baseball",
-        "rec.sport.hockey", "sci.crypt", "sci.electronics", "sci.med",
-        "sci.space", "soc.religion.christian", "talk.politics.guns",
-        "talk.politics.mideast", "talk.politics.misc", "talk.religion.misc",
+        "alt.atheism",
+        "comp.graphics",
+        "comp.os.ms-windows.misc",
+        "comp.sys.ibm.pc.hardware",
+        "comp.sys.mac.hardware",
+        "comp.windows.x",
+        "misc.forsale",
+        "rec.autos",
+        "rec.motorcycles",
+        "rec.sport.baseball",
+        "rec.sport.hockey",
+        "sci.crypt",
+        "sci.electronics",
+        "sci.med",
+        "sci.space",
+        "soc.religion.christian",
+        "talk.politics.guns",
+        "talk.politics.mideast",
+        "talk.politics.misc",
+        "talk.religion.misc",
     ]
 
 
@@ -103,6 +116,7 @@ async def track_requests(request: Request, call_next: Any) -> Response:
     ).inc()
     REQUEST_LATENCY.labels(endpoint=request.url.path).observe(elapsed)
     return response
+
 
 # Routes
 
@@ -164,7 +178,10 @@ async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
         topic = enqueue_job(job_id, body.text, decision.model_version)
         log.info(
             "Enqueued job %s to %s (concurrent=%d, max=%d)",
-            job_id, topic, _concurrent_requests, _MAX_CONCURRENT,
+            job_id,
+            topic,
+            _concurrent_requests,
+            _MAX_CONCURRENT,
         )
         return EnqueuedResponse(job_id=job_id, status="enqueued")
 
