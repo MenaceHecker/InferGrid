@@ -43,6 +43,7 @@ class MockRedis:
     def ping(self) -> bool:
         return True
 
+
 # result_key
 
 
@@ -54,6 +55,7 @@ def test_result_key_format():
 def test_result_key_includes_job_id():
     job_id = "test-job-id"
     assert job_id in result_key(job_id)
+
 
 # write_result
 
@@ -82,29 +84,34 @@ def test_write_result_payload_shape():
     assert payload["elapsed_ms"] == pytest.approx(42.0)
     assert "completed_at" in payload
 
+
 # process_message happy path
 
 
 def test_process_message_writes_result():
     r = MockRedis()
-    msg = json.dumps({
-        "job_id": "job-abc",
-        "text": "NASA launched a rocket.",
-        "model_version": "model_a",
-        "enqueued_at": time.time(),
-    }).encode()
+    msg = json.dumps(
+        {
+            "job_id": "job-abc",
+            "text": "NASA launched a rocket.",
+            "model_version": "model_a",
+            "enqueued_at": time.time(),
+        }
+    ).encode()
     process_message(msg, MockModel(), r)
     assert result_key("job-abc") in r.store
 
 
 def test_process_message_correct_prediction():
     r = MockRedis()
-    msg = json.dumps({
-        "job_id": "job-abc",
-        "text": "NASA launched a rocket.",
-        "model_version": "model_a",
-        "enqueued_at": time.time(),
-    }).encode()
+    msg = json.dumps(
+        {
+            "job_id": "job-abc",
+            "text": "NASA launched a rocket.",
+            "model_version": "model_a",
+            "enqueued_at": time.time(),
+        }
+    ).encode()
     process_message(msg, MockModel(), r)
     payload = json.loads(r.store[result_key("job-abc")][0])
     assert payload["prediction"] == "sci.space"
@@ -114,13 +121,16 @@ def test_process_message_correct_prediction():
 def test_process_message_default_model_version():
     r = MockRedis()
     # No model_version in message so should default to "primary"
-    msg = json.dumps({
-        "job_id": "job-xyz",
-        "text": "Some text",
-    }).encode()
+    msg = json.dumps(
+        {
+            "job_id": "job-xyz",
+            "text": "Some text",
+        }
+    ).encode()
     process_message(msg, MockModel(), r)
     payload = json.loads(r.store[result_key("job-xyz")][0])
     assert payload["model_version"] == "primary"
+
 
 # process_message error cases
 
@@ -147,11 +157,13 @@ def test_process_message_missing_text_does_not_raise():
 
 def test_process_message_inference_failure_writes_error_result():
     r = MockRedis()
-    msg = json.dumps({
-        "job_id": "job-broken",
-        "text": "Some text",
-        "model_version": "model_a",
-    }).encode()
+    msg = json.dumps(
+        {
+            "job_id": "job-broken",
+            "text": "Some text",
+            "model_version": "model_a",
+        }
+    ).encode()
     process_message(msg, BrokenModel(), r)
     # Error result should still be written so the WebSocket endpoint can return it
     assert result_key("job-broken") in r.store

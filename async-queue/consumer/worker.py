@@ -61,9 +61,11 @@ def load_model(model_path: str) -> Any:
     """Load sklearn or ONNX model — same logic as inference API."""
     if model_path.endswith(".onnx"):
         from app.models.onnx_loader import OnnxLoader
+
         return OnnxLoader(model_path, classes=[])
     else:
         from app.models.sklearn_loader import SklearnLoader
+
         return SklearnLoader(model_path)
 
 
@@ -87,16 +89,19 @@ def write_result(
     model_version: str,
     elapsed_ms: float,
 ) -> None:
-    payload = json.dumps({
-        "job_id": job_id,
-        "prediction": prediction,
-        "confidence": confidence,
-        "model_version": model_version,
-        "elapsed_ms": round(elapsed_ms, 2),
-        "completed_at": time.time(),
-    })
+    payload = json.dumps(
+        {
+            "job_id": job_id,
+            "prediction": prediction,
+            "confidence": confidence,
+            "model_version": model_version,
+            "elapsed_ms": round(elapsed_ms, 2),
+            "completed_at": time.time(),
+        }
+    )
     redis_client.setex(result_key(job_id), RESULT_TTL, payload)
     log.debug("Wrote result for job %s (TTL=%ds)", job_id, RESULT_TTL)
+
 
 # Job processing
 
@@ -128,36 +133,43 @@ def process_message(
         write_result(redis_client, job_id, prediction, confidence, model_version, elapsed_ms)
         log.info(
             "job=%s model_version=%s prediction=%s confidence=%.3f elapsed=%.1fms",
-            job_id, model_version, prediction, confidence, elapsed_ms,
+            job_id,
+            model_version,
+            prediction,
+            confidence,
+            elapsed_ms,
         )
     except Exception as exc:  # noqa: BLE001
         elapsed_ms = (time.monotonic() - start) * 1000
         # Write error result so the WebSocket endpoint can return it
-        error_payload = json.dumps({
-            "job_id": job_id,
-            "error": str(exc),
-            "completed_at": time.time(),
-        })
+        error_payload = json.dumps(
+            {
+                "job_id": job_id,
+                "error": str(exc),
+                "completed_at": time.time(),
+            }
+        )
         redis_client.setex(result_key(job_id), RESULT_TTL, error_payload)
         log.error("Inference failed for job %s: %s", job_id, exc)
+
 
 # Consumer loop
 
 
 def run_worker(model: Any, redis_client: redis.Redis) -> None:
-    consumer = Consumer({
-        "bootstrap.servers": KAFKA_BROKER,
-        "group.id": KAFKA_GROUP_ID,
-        "auto.offset.reset": "earliest",
-        "enable.auto.commit": True,
-        "auto.commit.interval.ms": 1000,
-        "session.timeout.ms": 10000,
-    })
+    consumer = Consumer(
+        {
+            "bootstrap.servers": KAFKA_BROKER,
+            "group.id": KAFKA_GROUP_ID,
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": True,
+            "auto.commit.interval.ms": 1000,
+            "session.timeout.ms": 10000,
+        }
+    )
 
     consumer.subscribe(TOPICS)
-    log.info(
-        "[%s] Subscribed to %s via %s", WORKER_ID, TOPICS, KAFKA_BROKER
-    )
+    log.info("[%s] Subscribed to %s via %s", WORKER_ID, TOPICS, KAFKA_BROKER)
 
     # Graceful shutdown on SIGTERM / SIGINT
     running = True
