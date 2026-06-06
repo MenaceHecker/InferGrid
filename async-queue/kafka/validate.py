@@ -10,6 +10,7 @@ Usage:
 
 import json
 import os
+import time
 import uuid
 
 from confluent_kafka import Consumer, Producer
@@ -35,32 +36,41 @@ def produce_and_consume(topic: str) -> None:
     job_id = str(uuid.uuid4())
     message = json.dumps({"job_id": job_id, "text": "NASA launched a rocket today."})
 
-    # Produce
-    producer = Producer({"bootstrap.servers": BROKER})
-    producer.produce(topic, key=job_id, value=message)
-    producer.flush(timeout=5)
-
-    # Consume
-    consumer = Consumer({
-        "bootstrap.servers": BROKER,
-        "group.id": f"validate-{uuid.uuid4()}",
-        "auto.offset.reset": "earliest",
-    })
+    consumer = Consumer(
+        {
+            "bootstrap.servers": BROKER,
+            "group.id": f"validate-{uuid.uuid4()}",
+            "auto.offset.reset": "latest",
+        }
+    )
     consumer.subscribe([topic])
 
-    for _ in range(20):  # poll up to 20 times
-        msg = consumer.poll(timeout=1.0)
-        if msg is None:
-            continue
-        if msg.error():
-            raise RuntimeError(f"Consumer error: {msg.error()}")
-        received = json.loads(msg.value())
-        assert received["job_id"] == job_id, "job_id mismatch"
-        consumer.close()
-        return
+    try:
+        assignment_deadline = time.monotonic() + 10
+        while not consumer.assignment():
+            consumer.poll(timeout=0.5)
+            if time.monotonic() >= assignment_deadline:
+                raise RuntimeError(f"Consumer assignment timed out for {topic}")
 
-    consumer.close()
-    raise RuntimeError(f"Did not receive message from {topic} within timeout")
+        producer = Producer({"bootstrap.servers": BROKER})
+        producer.produce(topic, key=job_id, value=message)
+        if producer.flush(timeout=5) != 0:
+            raise RuntimeError(f"Producer flush timed out for {topic}")
+
+        consume_deadline = time.monotonic() + 20
+        while time.monotonic() < consume_deadline:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+            if msg.error():
+                raise RuntimeError(f"Consumer error: {msg.error()}")
+            received = json.loads(msg.value())
+            if received.get("job_id") == job_id:
+                return
+
+        raise RuntimeError(f"Did not receive message from {topic} within timeout")
+    finally:
+        consumer.close()
 
 
 def main() -> None:
@@ -72,7 +82,7 @@ def main() -> None:
     for topic in TOPICS:
         print(f"==> Testing produce/consume on {topic}")
         produce_and_consume(topic)
-        print(f"      Round-trip OK")
+        print("      Round-trip OK")
 
     print("\n  Kafka validation passed. Both topics are healthy.")
 
