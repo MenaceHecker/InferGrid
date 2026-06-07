@@ -10,3 +10,6 @@ data:
   LOG_LEVEL: "info"
   EXPERIMENT_TRACKER_URL: "http://experiment-tracker.infergrid.svc.cluster.local:8001"
   EXPERIMENT_TRACKER_TIMEOUT: "0.5"
+  REDIS_URL: "redis://redis.infergrid.svc.cluster.local:6379"
+  WS_POLL_INTERVAL_SECONDS: "0.5"
+  WS_POLL_TIMEOUT_SECONDS: "30"
