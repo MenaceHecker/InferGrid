@@ -22,6 +22,7 @@ from app.models.onnx_loader import OnnxLoader
 from app.models.sklearn_loader import SklearnLoader
 from app.producer import enqueue_job
 from app.schemas import EnqueuedResponse, PredictRequest, PredictResponse
+from app.websocket import router as ws_router
 
 log = logging.getLogger(__name__)
 
@@ -56,26 +57,12 @@ def _get_classes(onnx_path: str) -> list[str]:
             payload = pickle.load(f)
         return list(payload["classes"])
     return [
-        "alt.atheism",
-        "comp.graphics",
-        "comp.os.ms-windows.misc",
-        "comp.sys.ibm.pc.hardware",
-        "comp.sys.mac.hardware",
-        "comp.windows.x",
-        "misc.forsale",
-        "rec.autos",
-        "rec.motorcycles",
-        "rec.sport.baseball",
-        "rec.sport.hockey",
-        "sci.crypt",
-        "sci.electronics",
-        "sci.med",
-        "sci.space",
-        "soc.religion.christian",
-        "talk.politics.guns",
-        "talk.politics.mideast",
-        "talk.politics.misc",
-        "talk.religion.misc",
+        "alt.atheism", "comp.graphics", "comp.os.ms-windows.misc",
+        "comp.sys.ibm.pc.hardware", "comp.sys.mac.hardware", "comp.windows.x",
+        "misc.forsale", "rec.autos", "rec.motorcycles", "rec.sport.baseball",
+        "rec.sport.hockey", "sci.crypt", "sci.electronics", "sci.med",
+        "sci.space", "soc.religion.christian", "talk.politics.guns",
+        "talk.politics.mideast", "talk.politics.misc", "talk.religion.misc",
     ]
 
 
@@ -99,6 +86,7 @@ app = FastAPI(
 )
 
 app.mount("/metrics", metrics_app)
+app.include_router(ws_router)
 
 
 # Middleware
@@ -154,38 +142,24 @@ async def ready() -> dict[str, Any]:
 
 @app.post("/predict")
 async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
-    """
-    Classify text synchronously, or enqueue to Kafka if concurrency
-    threshold is exceeded.
-
-    Returns:
-      200 PredictResponse  = inference ran inline
-      202 EnqueuedResponse = job enqueued; poll /ws/result/{job_id}
-    """
     global _concurrent_requests
 
     if _model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
-    # A/B routing decision (500ms timeout, falls back gracefully)
     config = get_active_ab_config()
     decision = make_routing_decision(config)
     AB_ROUTING_COUNT.labels(model_version=decision.model_version).inc()
 
-    # --- async path: enqueue when over threshold ---
     if _concurrent_requests >= _MAX_CONCURRENT:
         job_id = str(uuid.uuid4())
         topic = enqueue_job(job_id, body.text, decision.model_version)
         log.info(
             "Enqueued job %s to %s (concurrent=%d, max=%d)",
-            job_id,
-            topic,
-            _concurrent_requests,
-            _MAX_CONCURRENT,
+            job_id, topic, _concurrent_requests, _MAX_CONCURRENT,
         )
         return EnqueuedResponse(job_id=job_id, status="enqueued")
 
-    # --- sync path: run inference inline ---
     _concurrent_requests += 1
     try:
         prediction, confidence = _model.predict(body.text)
