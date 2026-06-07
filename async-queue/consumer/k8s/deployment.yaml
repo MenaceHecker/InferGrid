@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: inference-worker
-          image: gcr.io/infergrid-prod/inference-worker:latest
+          image: us-central1-docker.pkg.dev/infergrid-prod/infergrid/inference-worker:latest
           env:
             - name: KAFKA_BROKER
               value: "kafka.infergrid.svc.cluster.local:9092"
