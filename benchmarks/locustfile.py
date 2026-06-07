@@ -30,7 +30,6 @@ import random
 import time
 
 from locust import HttpUser, between, events, task
-from locust.runners import MasterRunner
 
 SAMPLE_TEXTS = [
     "NASA launched a new rocket toward the International Space Station today.",
@@ -94,7 +93,7 @@ class AsyncUser(HttpUser):
     then polls for results via the HTTP fallback endpoint.
     """
 
-    wait_time = between(0.05, 0.1)   # faster than SyncUser to force enqueue
+    wait_time = between(0.05, 0.1)  # faster than SyncUser to force enqueue
     weight = 3
 
     @task(4)
@@ -143,7 +142,6 @@ class AsyncUser(HttpUser):
             name="/result/{job_id} [poll]",
         ) as response:
             if response.status_code == 200:
-                total_ms = (time.monotonic() - enqueue_time) * 1000
                 _async_results.pop(job_id, None)
                 response.success()
             elif response.status_code == 404:
@@ -156,6 +154,7 @@ class AsyncUser(HttpUser):
                     response.success()  # still pending, not a failure
             else:
                 response.failure(f"Unexpected status {response.status_code}")
+
 
 # Custom event so it would print summary at test end
 
