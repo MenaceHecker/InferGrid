@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: inference-worker
-          image: gcr.io/YOUR_PROJECT_ID/inference-worker:latest
+          image: gcr.io/infergrid-prod/inference-worker:latest
           env:
             - name: KAFKA_BROKER
               value: "kafka.infergrid.svc.cluster.local:9092"
@@ -28,10 +28,7 @@ spec:
             - name: REDIS_URL
               value: "redis://redis.infergrid.svc.cluster.local:6379"
             - name: MODEL_PATH
-              valueFrom:
-                configMapKeyRef:
-                  name: inference-api-config
-                  key: MODEL_PATH
+              value: "/app/models/classifier.pkl"
             - name: RESULT_TTL_SECONDS
               value: "300"
             - name: WORKER_ID

@@ -28,7 +28,6 @@ class BrokenModel:
 
 
 class MockRedis:
-
     def __init__(self):
         self.store: dict[str, tuple[str, int]] = {}
 
