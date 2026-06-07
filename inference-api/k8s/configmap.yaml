@@ -4,7 +4,7 @@ metadata:
   name: inference-api-config
   namespace: infergrid
 data:
-  MODEL_PATH: "/app/models/newsgroups_model.pkl"
+  MODEL_PATH: "/app/models/classifier.pkl"
   MODEL_BACKEND: "sklearn"
   MAX_CONCURRENT_REQUESTS: "10"
   LOG_LEVEL: "info"

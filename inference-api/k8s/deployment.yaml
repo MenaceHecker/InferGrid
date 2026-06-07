@@ -43,6 +43,26 @@ spec:
                 configMapKeyRef:
                   name: inference-api-config
                   key: MODEL_BACKEND
+            - name: MAX_CONCURRENT_REQUESTS
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: MAX_CONCURRENT_REQUESTS
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: REDIS_URL
+            - name: WS_POLL_INTERVAL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: WS_POLL_INTERVAL_SECONDS
+            - name: WS_POLL_TIMEOUT_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: inference-api-config
+                  key: WS_POLL_TIMEOUT_SECONDS
             - name: API_KEY
               valueFrom:
                 secretKeyRef:

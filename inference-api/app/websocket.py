@@ -75,32 +75,35 @@ async def ws_result(websocket: WebSocket, job_id: str) -> None:
             if result is not None:
                 payload = json.loads(result)
                 await websocket.send_json(payload)
-                log.info(
-                    "Pushed result for job %s after %.1fs", job_id, elapsed
-                )
+                log.info("Pushed result for job %s after %.1fs", job_id, elapsed)
                 return
 
             # Send keepalive so client knows we're still waiting
             try:
-                await websocket.send_json({
-                    "status": "pending",
-                    "job_id": job_id,
-                    "elapsed_s": round(elapsed, 1),
-                })
+                await websocket.send_json(
+                    {
+                        "status": "pending",
+                        "job_id": job_id,
+                        "elapsed_s": round(elapsed, 1),
+                    }
+                )
             except WebSocketDisconnect:
                 log.info("Client disconnected for job %s", job_id)
                 return
 
             import asyncio
+
             await asyncio.sleep(POLL_INTERVAL)
             elapsed += POLL_INTERVAL
 
         # Timeout
-        await websocket.send_json({
-            "status": "timeout",
-            "job_id": job_id,
-            "message": f"Result not available after {POLL_TIMEOUT}s",
-        })
+        await websocket.send_json(
+            {
+                "status": "timeout",
+                "job_id": job_id,
+                "message": f"Result not available after {POLL_TIMEOUT}s",
+            }
+        )
         log.warning("Timeout waiting for job %s result", job_id)
 
     except WebSocketDisconnect:
@@ -108,6 +111,7 @@ async def ws_result(websocket: WebSocket, job_id: str) -> None:
     finally:
         await redis.aclose()
         await websocket.close()
+
 
 # HTTP fallback for clients that don't support WebSockets
 
