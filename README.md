@@ -238,3 +238,7 @@ CI runs ruff and pytest on every push. End-to-end tests are marked `pytest.mark.
 ## Observability
 
 Full documentation on the Prometheus metrics, Grafana dashboards, drift detection logic, and alert thresholds is in [docs/observability.md](docs/observability.md).
+
+## Architecture
+
+![InferGrid architecture](docs/architecture.png)
