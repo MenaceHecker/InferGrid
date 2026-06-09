@@ -49,6 +49,7 @@ def verify_api_key(api_key: str | None = Security(API_KEY_HEADER)) -> str:
     """
     if not API_KEY:
         import logging
+
         logging.getLogger(__name__).warning(
             "API_KEY env var not set so authentication is disabled. "
             "Set API_KEY in your Kubernetes Secret before exposing this service."

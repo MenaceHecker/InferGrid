@@ -58,12 +58,26 @@ def _get_classes(onnx_path: str) -> list[str]:
             payload = pickle.load(f)
         return list(payload["classes"])
     return [
-        "alt.atheism", "comp.graphics", "comp.os.ms-windows.misc",
-        "comp.sys.ibm.pc.hardware", "comp.sys.mac.hardware", "comp.windows.x",
-        "misc.forsale", "rec.autos", "rec.motorcycles", "rec.sport.baseball",
-        "rec.sport.hockey", "sci.crypt", "sci.electronics", "sci.med",
-        "sci.space", "soc.religion.christian", "talk.politics.guns",
-        "talk.politics.mideast", "talk.politics.misc", "talk.religion.misc",
+        "alt.atheism",
+        "comp.graphics",
+        "comp.os.ms-windows.misc",
+        "comp.sys.ibm.pc.hardware",
+        "comp.sys.mac.hardware",
+        "comp.windows.x",
+        "misc.forsale",
+        "rec.autos",
+        "rec.motorcycles",
+        "rec.sport.baseball",
+        "rec.sport.hockey",
+        "sci.crypt",
+        "sci.electronics",
+        "sci.med",
+        "sci.space",
+        "soc.religion.christian",
+        "talk.politics.guns",
+        "talk.politics.mideast",
+        "talk.politics.misc",
+        "talk.religion.misc",
     ]
 
 
@@ -105,6 +119,7 @@ async def track_requests(request: Request, call_next: Any) -> Response:
     ).inc()
     REQUEST_LATENCY.labels(endpoint=request.url.path).observe(elapsed)
     return response
+
 
 # Routes
 
@@ -158,7 +173,10 @@ async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
         topic = enqueue_job(job_id, body.text, decision.model_version)
         log.info(
             "Enqueued job %s to %s (concurrent=%d, max=%d)",
-            job_id, topic, _concurrent_requests, _MAX_CONCURRENT,
+            job_id,
+            topic,
+            _concurrent_requests,
+            _MAX_CONCURRENT,
         )
         return EnqueuedResponse(job_id=job_id, status="enqueued")
 
@@ -181,4 +199,5 @@ async def http_result_authed(job_id: str) -> Any:
     # Auth-protected alias, the actual handler is in websocket.py
     # This route exists so the HTTP fallback also requires a key
     from app.websocket import http_result
+
     return await http_result(job_id)

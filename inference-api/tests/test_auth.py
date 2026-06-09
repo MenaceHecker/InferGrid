@@ -33,6 +33,7 @@ def inject_mock_model(monkeypatch):
 @pytest.fixture(autouse=True)
 def patch_ab_router(monkeypatch):
     from app.ab_router import RoutingDecision
+
     monkeypatch.setattr("app.main.get_active_ab_config", lambda: None)
     monkeypatch.setattr(
         "app.main.make_routing_decision",
@@ -44,6 +45,7 @@ def patch_ab_router(monkeypatch):
 def client_with_key(monkeypatch):
     """Client with API_KEY env var set."""
     import app.auth as auth_module
+
     monkeypatch.setattr(auth_module, "API_KEY", VALID_KEY)
     return TestClient(app)
 
@@ -52,8 +54,10 @@ def client_with_key(monkeypatch):
 def client_no_key(monkeypatch):
     """Client simulating environment with no API_KEY configured."""
     import app.auth as auth_module
+
     monkeypatch.setattr(auth_module, "API_KEY", "")
     return TestClient(app)
+
 
 # Exempt endpoints - no auth required
 
@@ -117,6 +121,7 @@ def test_predict_wrong_key_detail(client_with_key):
         headers={"X-API-Key": "wrong-key"},
     )
     assert "Invalid" in response.json()["detail"]
+
 
 # Auth disabled when API_KEY not set (local dev)
 
