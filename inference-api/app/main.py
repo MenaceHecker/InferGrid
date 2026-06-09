@@ -7,9 +7,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 
 from app.ab_router import get_active_ab_config, make_routing_decision
+from app.auth import verify_api_key
 from app.metrics import (
     AB_ROUTING_COUNT,
     MODEL_LOAD_TIME,
@@ -57,26 +58,12 @@ def _get_classes(onnx_path: str) -> list[str]:
             payload = pickle.load(f)
         return list(payload["classes"])
     return [
-        "alt.atheism",
-        "comp.graphics",
-        "comp.os.ms-windows.misc",
-        "comp.sys.ibm.pc.hardware",
-        "comp.sys.mac.hardware",
-        "comp.windows.x",
-        "misc.forsale",
-        "rec.autos",
-        "rec.motorcycles",
-        "rec.sport.baseball",
-        "rec.sport.hockey",
-        "sci.crypt",
-        "sci.electronics",
-        "sci.med",
-        "sci.space",
-        "soc.religion.christian",
-        "talk.politics.guns",
-        "talk.politics.mideast",
-        "talk.politics.misc",
-        "talk.religion.misc",
+        "alt.atheism", "comp.graphics", "comp.os.ms-windows.misc",
+        "comp.sys.ibm.pc.hardware", "comp.sys.mac.hardware", "comp.windows.x",
+        "misc.forsale", "rec.autos", "rec.motorcycles", "rec.sport.baseball",
+        "rec.sport.hockey", "sci.crypt", "sci.electronics", "sci.med",
+        "sci.space", "soc.religion.christian", "talk.politics.guns",
+        "talk.politics.mideast", "talk.politics.misc", "talk.religion.misc",
     ]
 
 
@@ -119,12 +106,12 @@ async def track_requests(request: Request, call_next: Any) -> Response:
     REQUEST_LATENCY.labels(endpoint=request.url.path).observe(elapsed)
     return response
 
-
 # Routes
 
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    # No auth Kubernetes liveness probe
     return {
         "status": "ok",
         "model_loaded": _model is not None,
@@ -134,6 +121,7 @@ async def health() -> dict[str, Any]:
 
 @app.get("/ready")
 async def ready() -> dict[str, Any]:
+    # No auth Kubernetes readiness probe
     if _model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     start = time.monotonic()
@@ -154,7 +142,7 @@ async def ready() -> dict[str, Any]:
     }
 
 
-@app.post("/predict")
+@app.post("/predict", dependencies=[Depends(verify_api_key)])
 async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
     global _concurrent_requests
 
@@ -170,10 +158,7 @@ async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
         topic = enqueue_job(job_id, body.text, decision.model_version)
         log.info(
             "Enqueued job %s to %s (concurrent=%d, max=%d)",
-            job_id,
-            topic,
-            _concurrent_requests,
-            _MAX_CONCURRENT,
+            job_id, topic, _concurrent_requests, _MAX_CONCURRENT,
         )
         return EnqueuedResponse(job_id=job_id, status="enqueued")
 
@@ -181,11 +166,6 @@ async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
     try:
         prediction, confidence = _model.predict(body.text)
         PREDICTION_CONFIDENCE.observe(confidence)
-        log.info(
-            "predict routed to %s (model_id=%s)",
-            decision.model_version,
-            decision.model_id,
-        )
         return PredictResponse(
             prediction=prediction,
             confidence=confidence,
@@ -194,3 +174,11 @@ async def predict(body: PredictRequest) -> PredictResponse | EnqueuedResponse:
         )
     finally:
         _concurrent_requests -= 1
+
+
+@app.get("/result/{job_id}", dependencies=[Depends(verify_api_key)])
+async def http_result_authed(job_id: str) -> Any:
+    # Auth-protected alias, the actual handler is in websocket.py
+    # This route exists so the HTTP fallback also requires a key
+    from app.websocket import http_result
+    return await http_result(job_id)
