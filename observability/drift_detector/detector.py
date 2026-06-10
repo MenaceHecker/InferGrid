@@ -17,7 +17,6 @@ Environment variables:
   BASELINE_PATH       Path to a .npy file containing the baseline confidence array
   DRIFT_THRESHOLD     KS-statistic threshold for drift alerts (default: 0.15)
   WINDOW_SECONDS      How far back to pull live samples (default: 3600 = 1 hour)
-  WINDOW_SAMPLES      Max samples to pull from Prometheus (default: 500)
   POLL_INTERVAL       Seconds between detector runs (default: 60)
   PORT                Port for the /metrics exposition server (default: 9091)
 """
@@ -41,7 +40,6 @@ PROMETHEUS_URL = os.environ.get(
 BASELINE_PATH = os.environ.get("BASELINE_PATH", "/app/baseline.npy")
 DRIFT_THRESHOLD = float(os.environ.get("DRIFT_THRESHOLD", "0.15"))
 WINDOW_SECONDS = int(os.environ.get("WINDOW_SECONDS", "3600"))
-WINDOW_SAMPLES = int(os.environ.get("WINDOW_SAMPLES", "500"))
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
 PORT = int(os.environ.get("PORT", "9091"))
 
@@ -83,58 +81,57 @@ def load_baseline(path: str) -> np.ndarray:
     return baseline
 
 
-# Live sample fetching from Prometheus
+# Live histogram fetching from Prometheus
 
 
-def fetch_live_samples(
+def fetch_live_histogram(
     prometheus_url: str,
     window_seconds: int,
-    max_samples: int,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray, int]:
     """
-    Query Prometheus for recent prediction_confidence observations.
-    Uses the _sum / _count approach to approximate the mean per bucket,
-    then falls back to pulling raw bucket boundaries as a distribution.
+    Query cumulative prediction_confidence histogram increases over the window.
 
-    Returns a 1-D numpy array of confidence scores (may be empty).
+    Returns finite bucket bounds, cumulative counts, and total observations.
     """
-    end = time.time()
-    start = end - window_seconds
-    step = max(window_seconds // max_samples, 1)
-
-    query = "rate(prediction_confidence_sum[2m]) / rate(prediction_confidence_count[2m])"
+    query = f"sum(increase(prediction_confidence_bucket[{window_seconds}s])) by (le)"
 
     try:
         resp = requests.get(
-            f"{prometheus_url}/api/v1/query_range",
-            params={
-                "query": query,
-                "start": start,
-                "end": end,
-                "step": step,
-            },
+            f"{prometheus_url}/api/v1/query",
+            params={"query": query},
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
 
-        values = []
+        buckets = []
+        total = 0
         for series in data.get("data", {}).get("result", []):
-            for _, v in series.get("values", []):
-                try:
-                    fv = float(v)
-                    if 0.0 <= fv <= 1.0:
-                        values.append(fv)
-                except (ValueError, TypeError):
-                    continue
+            try:
+                boundary = series["metric"]["le"]
+                count = max(float(series["value"][1]), 0.0)
+                if boundary == "+Inf":
+                    total = max(total, int(round(count)))
+                else:
+                    buckets.append((float(boundary), count))
+            except (KeyError, IndexError, TypeError, ValueError):
+                continue
 
-        samples = np.array(values[:max_samples])
-        log.info("Fetched %d live samples from Prometheus", len(samples))
-        return samples
+        if not buckets:
+            return np.array([]), np.array([]), total
+
+        buckets.sort(key=lambda item: item[0])
+        bounds = np.array([boundary for boundary, _ in buckets])
+        cumulative_counts = np.maximum.accumulate(np.array([count for _, count in buckets]))
+        if total == 0:
+            total = int(round(cumulative_counts[-1]))
+
+        log.info("Fetched live confidence histogram with %d observations", total)
+        return bounds, cumulative_counts, total
 
     except requests.RequestException as exc:
-        log.warning("Failed to fetch live samples from Prometheus: %s", exc)
-        return np.array([])
+        log.warning("Failed to fetch live histogram from Prometheus: %s", exc)
+        return np.array([]), np.array([]), 0
 
 
 # KS-test
@@ -147,6 +144,23 @@ def compute_ks(baseline: np.ndarray, live: np.ndarray) -> tuple[float, float]:
     """
     result = ks_2samp(baseline, live)
     return float(result.statistic), float(result.pvalue)
+
+
+def compute_binned_ks(
+    baseline: np.ndarray,
+    bounds: np.ndarray,
+    cumulative_counts: np.ndarray,
+    total: int,
+) -> float:
+    """Compute the maximum baseline/live CDF difference at histogram bounds."""
+    if len(baseline) == 0 or len(bounds) == 0 or total <= 0:
+        raise ValueError("Baseline and live histogram must be non-empty")
+    if len(bounds) != len(cumulative_counts):
+        raise ValueError("Histogram bounds and counts must have equal length")
+
+    baseline_cdf = np.searchsorted(np.sort(baseline), bounds, side="right") / len(baseline)
+    live_cdf = np.clip(cumulative_counts / total, 0.0, 1.0)
+    return float(np.max(np.abs(baseline_cdf - live_cdf)))
 
 
 # Main detector loop
@@ -162,33 +176,42 @@ def run_detector(baseline: np.ndarray) -> None:
 
     while True:
         try:
-            live = fetch_live_samples(PROMETHEUS_URL, WINDOW_SECONDS, WINDOW_SAMPLES)
+            bounds, cumulative_counts, sample_count = fetch_live_histogram(
+                PROMETHEUS_URL,
+                WINDOW_SECONDS,
+            )
 
-            if len(live) < 30:
-                log.info("Not enough live samples (%d < 30) — skipping KS test", len(live))
-                WINDOW_SIZE.set(len(live))
+            if sample_count < 30:
+                log.info(
+                    "Not enough live samples (%d < 30) — skipping KS test",
+                    sample_count,
+                )
+                WINDOW_SIZE.set(sample_count)
                 time.sleep(POLL_INTERVAL)
                 continue
 
-            ks_stat, p_value = compute_ks(baseline, live)
+            ks_stat = compute_binned_ks(
+                baseline,
+                bounds,
+                cumulative_counts,
+                sample_count,
+            )
 
             KS_STATISTIC.set(ks_stat)
-            WINDOW_SIZE.set(len(live))
+            WINDOW_SIZE.set(sample_count)
 
             if ks_stat > DRIFT_THRESHOLD:
                 log.warning(
-                    "DRIFT DETECTED: KS=%.4f p=%.4f (threshold=%.2f, samples=%d)",
+                    "DRIFT DETECTED: KS=%.4f (threshold=%.2f, samples=%d)",
                     ks_stat,
-                    p_value,
                     DRIFT_THRESHOLD,
-                    len(live),
+                    sample_count,
                 )
             else:
                 log.info(
-                    "No drift: KS=%.4f p=%.4f (samples=%d)",
+                    "No drift: KS=%.4f (samples=%d)",
                     ks_stat,
-                    p_value,
-                    len(live),
+                    sample_count,
                 )
 
         except Exception as exc:  # noqa: BLE001

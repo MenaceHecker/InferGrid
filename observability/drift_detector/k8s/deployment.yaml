@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: drift-detector
-          image: us-central1-docker.pkg.dev/infergrid-prod/infergrid/drift-detector:latest
+          image: us-central1-docker.pkg.dev/infergrid-prod/infergrid/drift-detector:histogram-cdf-20260610
           env:
             - name: PROMETHEUS_URL
               value: "http://prometheus.monitoring.svc.cluster.local:9090"
@@ -31,8 +31,6 @@ spec:
               value: "0.15"
             - name: WINDOW_SECONDS
               value: "3600"
-            - name: WINDOW_SAMPLES
-              value: "500"
             - name: POLL_INTERVAL
               value: "60"
             - name: PORT
