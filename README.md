@@ -242,3 +242,7 @@ Full documentation on the Prometheus metrics, Grafana dashboards, drift detectio
 ## Architecture
 
 ![InferGrid architecture](docs/architecture.png)
+
+## Live dashboards
+
+![Live Grafana Model Performance dashboard](docs/grafana-screenshot.png)
