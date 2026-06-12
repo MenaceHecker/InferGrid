@@ -3,7 +3,7 @@ async-queue/kafka/validate.py
 Validates Kafka is working by producing a message to each topic
 and consuming it back. Run after deploy.sh succeeds.
 
-Usage:
+How to run:
   KAFKA_BROKER=localhost:9092 python async-queue/kafka/validate.py
   (port-forward first: kubectl port-forward -n infergrid svc/kafka 9092:9092)
 """
