@@ -1,6 +1,6 @@
 # InferGrid
 
-A distributed ML inference platform I built to learn what it actually takes to run a model in production - not just serve predictions, but handle traffic spikes, detect when the model starts behaving differently, and safely roll out new versions without taking anything down.
+A distributed ML inference platform I built to learn what it actually takes to run a model in production and not just serve predictions, but handle traffic spikes, detect when the model starts behaving differently, and safely roll out new versions without taking anything down.
 
 The system runs on GKE and has been load tested to 200 concurrent users with zero failures. The async path (Kafka queue → consumer worker → WebSocket delivery) sustains 699 RPS at 200 users. The sync path holds under 100ms p95 up to 50 users.
 
